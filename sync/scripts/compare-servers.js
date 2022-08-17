@@ -15,11 +15,12 @@ export async function main(ns) {
     for (const server of sortObjectsBy(sortKey, servers)) {
         let name = server.hostname
         ns.tprintf(
-            "%20s: m: %8s; gr: %4d; sm: %3d; wt: %10d; gt: %10d; ht: %10d",
+            "%20s: m: %8s; gr: %4d; sm: %3d; grsm: %.2f; wt: %10d; gt: %10d; ht: %10d",
             server.hostname,
             ns.nFormat(server.moneyMax, "($0.00a)"),
             server.serverGrowth,
             server.minDifficulty,
+            server.minDifficulty / server.serverGrowth,
             ns.getWeakenTime(name),
             ns.getGrowTime(name),
             ns.getHackTime(name),

@@ -543,7 +543,7 @@ export function getWeakenAttack(ns) {
 
 export function getHackAttack(ns) {
 	return {
-		"type": "weaken",
+		"type": "hack",
 		"wait": ns.getHackTime,
 		"threads": "hackThreads",
 		"script": "/payload/hack-only.js",
