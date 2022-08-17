@@ -13,6 +13,7 @@ import {
 export async function main(ns) {
     var expected = 6
     var completed = []
+    var serverRamLimit = 4096
     var hacknetNodeLimit = 8
     var hacknetRamUpgrade = getHacknetRamUpgrade(ns, hacknetNodeLimit)
     var hacknetCoreUpgrade = getHacknetCoreUpgrade(ns, hacknetNodeLimit)
@@ -29,7 +30,7 @@ export async function main(ns) {
         if (await buyServers(ns)) {
             markCompleted("buyServers")
         }
-        if (await upgradeServers(ns, 1024)) {
+        if (await upgradeServers(ns, serverRamLimit)) {
             markCompleted("upgradeServers")
         }
         if (buyHacknetNodes(ns, hacknetNodeLimit)) {

@@ -11,7 +11,6 @@ import {
     getTargetAddPort,
     getTargetRemovePort,
     threadsAvailable,
-    sortObjectsBy,
 } from "lib/utils.js";
 
 /** @param {import("../..").NS } ns */
