@@ -1,4 +1,4 @@
-import { getAllServers, applyFilter, filter_hackingSkill, filter_minMaxMoney, sortObjectsBy } from "lib/utils.js";
+import { getAllServers, applyFilter, filter_hackingSkill, filter_minMaxMoney, filter_adminRights, sortObjectsBy } from "lib/utils.js";
 
 /** @param {import("../..").NS } ns */
 export async function main(ns) {
@@ -8,7 +8,8 @@ export async function main(ns) {
     }
     var skillFilter = filter_hackingSkill(ns.getHackingLevel())
     var maxMoneyFilter = filter_minMaxMoney(1)
-    var servers = applyFilter(getAllServers(ns), [skillFilter])
+    var hasAdminFilter = filter_adminRights(false)
+    var servers = applyFilter(getAllServers(ns), [skillFilter, hasAdminFilter])
     servers = applyFilter(servers, [maxMoneyFilter], false)
 
     for (const server of sortObjectsBy(sortKey, servers)) {
