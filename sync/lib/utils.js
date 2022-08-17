@@ -453,3 +453,55 @@ export async function schedule(ns, script, shouldThreads = 1, args = []) {
 	var execThreads = threads < 0 ? maxThreads : threads
 	return ns.exec(script, target, execThreads, ...args) != 0
 }
+
+export function performAttack(ns, attack, target, attackers) {
+	var addonInfo = getAdditionalServerInfo(ns, target)
+	var waitTime = attack["wait"](target.hostname) + 1000
+	var requiredThreads = addonInfo[attack["threads"]]
+	var scriptRam = ns.getScriptRam(attack["script"])
+	ns.printf("Perform '%s' on %s (%d):", attack["type"], target.hostname, requiredThreads)
+	for (const name in attackers) {
+		let serverThreads = Math.floor((attackers[name].maxRam - attackers[name].ramUsed) / scriptRam)
+		if (serverThreads > requiredThreads) {
+			serverThreads = requiredThreads
+		}
+		let pid = ns.exec(attack["script"], name, serverThreads, target.hostname, serverThreads)
+		if (pid == 0) {
+			ns.tprintf("Error while performing '%s' on %s from %s", attack["type"], target.hostname, name)
+			continue
+		}
+		requiredThreads = requiredThreads - serverThreads
+		ns.printf("  Performing '%s' with %s (%d / %d)", attack["type"], name, serverThreads, requiredThreads)
+		if (requiredThreads <= 0) {
+			break
+		}
+	}
+	return waitTime
+}
+
+export function getGrowAttack(ns) {
+	return {
+		"type": "grow",
+		"wait": ns.getGrowTime,
+		"threads": "growThreads",
+		"script": "/payload/grow-only.js",
+	}
+}
+
+export function getWeakenAttack(ns) {
+	return {
+		"type": "weaken",
+		"wait": ns.getWeakenTime,
+		"threads": "weakenThreads",
+		"script": "/payload/weaken-only.js",
+	}
+}
+
+export function getHackAttack(ns) {
+	return {
+		"type": "weaken",
+		"wait": ns.getHackTime,
+		"threads": "hackThreads",
+		"script": "/payload/hack-only.js",
+	}
+}
