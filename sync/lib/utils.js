@@ -155,27 +155,23 @@ export function difference(...lists) {
 	return [...(new Set(result))]
 }
 
-export function threadsAvailable(ns, threadSize, compensate = false) {
+export function threadsAvailable(ns, threadSize, onlyFree = true) {
 	var adminFilter = filter_adminRights(true)
-	var ramFilter = filter_minRamAvailable(threadSize)
 	var targets = getAllServers(ns)
+	var ramFilter = filter_minRamAvailable(threadSize)
+	if (!onlyFree) {
+		ramFilter = filter_minRam(threadSize)
+	}
 	targets = applyFilter(targets, [adminFilter, ramFilter], false, false)
 
 	var threads = 0
-	var script = ns.getRunningScript()
 	for (const name in targets) {
 		let target = targets[name]
-		let ramAvailable = target.maxRam - target.ramUsed
-		if (compensate) {
-			// ensure that the memory usage of this script
-			// does not affect our calculation
-			if (name == script.server) {
-				ramAvailable = ramAvailable + script.ramUsage
-			}
+		let ram = target.maxRam - target.ramUsed
+		if (!onlyFree) {
+			ram = target.maxRam
 		}
-		let serverThreads = Math.floor(ramAvailable / threadSize)
-		ns.printf("Server threads:")
-		ns.printf("  %s (%d)", name, serverThreads)
+		let serverThreads = Math.floor(ram / threadSize)
 		threads = threads + serverThreads
 	}
 	return threads
@@ -456,10 +452,14 @@ export async function schedule(ns, script, shouldThreads = 1, args = []) {
 
 export function performAttack(ns, attack, target, attackers) {
 	var addonInfo = getAdditionalServerInfo(ns, target)
-	var waitTime = attack["wait"](target.hostname) + 1000
+	var waitTime = attack["wait"](target.hostname) + 25
 	var requiredThreads = addonInfo[attack["threads"]]
+	var attackThreads = 0
+	var serverCount = 0
 	var scriptRam = ns.getScriptRam(attack["script"])
-	ns.printf("Perform '%s' on %s (%d):", attack["type"], target.hostname, requiredThreads)
+
+	ns.disableLog("exec")
+	var pids = []
 	for (const name in attackers) {
 		let serverThreads = Math.floor((attackers[name].maxRam - attackers[name].ramUsed) / scriptRam)
 		if (serverThreads > requiredThreads) {
@@ -470,13 +470,22 @@ export function performAttack(ns, attack, target, attackers) {
 			ns.tprintf("Error while performing '%s' on %s from %s", attack["type"], target.hostname, name)
 			continue
 		}
+		pids.push(pid)
 		requiredThreads = requiredThreads - serverThreads
-		ns.printf("  Performing '%s' with %s (%d / %d)", attack["type"], name, serverThreads, requiredThreads)
+		attackThreads = attackThreads + serverThreads
+		serverCount++
 		if (requiredThreads <= 0) {
 			break
 		}
 	}
-	return waitTime
+	return {
+		"waitTime": waitTime,
+		"requiredThreads": addonInfo[attack["threads"]],
+		"attackThreads": attackThreads,
+		"operation": attack["type"],
+		"serverCount": serverCount,
+		"pids": pids,
+	}
 }
 
 export function getGrowAttack(ns) {
@@ -504,4 +513,12 @@ export function getHackAttack(ns) {
 		"threads": "hackThreads",
 		"script": "/payload/hack-only.js",
 	}
+}
+
+export function getTargetAddPort(ns) {
+	return ns.getPortHandle(1)
+}
+
+export function getTargetRemovePort(ns) {
+	return ns.getPortHandle(2)
 }

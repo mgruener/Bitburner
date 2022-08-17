@@ -8,18 +8,42 @@ import {
     getGrowAttack,
     getWeakenAttack,
     getHackAttack,
+    getTargetAddPort,
+    getTargetRemovePort,
+    threadsAvailable,
 } from "lib/utils.js";
 
 /** @param {import("../..").NS } ns */
 export async function main(ns) {
-    const targets = ns.args
+    var targets = [...ns.args]
     const growAttack = getGrowAttack(ns)
     const weakenAttack = getWeakenAttack(ns)
     const hackAttack = getHackAttack(ns)
+    ns.disableLog("disableLog")
+    ns.disableLog("sleep")
+
+    // If there is an already running instance of the scheduler
+    // just add the parameters as targets and exit. Bitburner
+    // itself prevents multiple instances of the same script running
+    // with the same parameters
+    if (isRunning(ns)) {
+        let addPort = getTargetAddPort(ns)
+        for (const t of targets) {
+            while (!addPort.tryWrite(t)) {
+                await ns.sleep(1000)
+            }
+        }
+        return
+    }
 
     let procs = {}
     while (true) {
         let schedulables = getSchedulables(targets, procs)
+        // check if there is anything to schedule and if not,
+        // wait a fixed amount before checking again
+        if (schedulables.length <= 0) {
+            await ns.sleep(5000)
+        }
         for (const targetName of schedulables) {
             let target = ns.getServer(targetName)
             let addonInfo = getAdditionalServerInfo(ns, target)
@@ -30,17 +54,19 @@ export async function main(ns) {
                 continue
             }
 
-            let waitTime = 0
+            let state = {}
             if (target.hackDifficulty > addonInfo.securityThreshold) {
-                waitTime = performAttack(ns, weakenAttack, target, attackers)
+                state = performAttack(ns, weakenAttack, target, attackers)
             } else if (target.moneyAvailable < addonInfo.moneyThreshold) {
-                waitTime = performAttack(ns, growAttack, target, attackers)
+                state = performAttack(ns, growAttack, target, attackers)
             } else {
-                waitTime = performAttack(ns, hackAttack, target, attackers)
+                state = performAttack(ns, hackAttack, target, attackers)
             }
-            procs[targetName] = waitTime
+            procs[targetName] = state
         }
-        procs = await wait(ns, procs)
+        printState(ns, procs, targets)
+        procs = await wait(ns, procs, 10000)
+        targets = updateTargets(ns, targets)
     }
 }
 
@@ -63,26 +89,109 @@ function getSchedulables(targets, procs) {
     return schedulables
 }
 
-async function wait(ns, procs) {
+async function wait(ns, procs, maxWait) {
     var newProcs = {}
     var waitOn = ""
     var waitTime = Infinity
     for (const proc in procs) {
-        let procWait = procs[proc]
+        let procWait = procs[proc]["waitTime"]
         if (procWait < waitTime) {
             waitOn = proc
             waitTime = procWait
         }
     }
-    if (waitOn == "") {
-        return newProcs
+    if (waitTime > maxWait) {
+        waitOn = ""
+        waitTime = maxWait
     }
+
+    ns.printf("Sleeping for %s", ns.tFormat(waitTime))
     await ns.sleep(waitTime)
     for (const proc in procs) {
         if (proc == waitOn) {
             continue
         }
-        newProcs[proc] = procs[proc] - waitTime
+        let newWaitTime = procs[proc]["waitTime"] - waitTime
+        if (newWaitTime <= 0) {
+            continue
+        }
+        newProcs[proc] = procs[proc]
+        newProcs[proc]["waitTime"] = newWaitTime
     }
     return newProcs
+}
+
+function updateTargets(ns, current) {
+    var newTargets = [...current]
+    var addPort = getTargetAddPort(ns)
+    var removePort = getTargetRemovePort(ns)
+
+    while (!addPort.empty()) {
+        let data = addPort.read()
+        // Just a safety precaution as I have no idea
+        // how race-condition safe the port interface is.
+        // As in "if empty() returns false, is it guaranteed to
+        // stay non empty in the current function?"
+        // Also do not add targets that are already present
+        if ((data != "NULL PORT DATA") && (!newTargets.includes(data))) {
+            newTargets.push(data)
+        }
+    }
+    while (!removePort.empty()) {
+        let data = removePort.read()
+        // See comment above
+        if (data != "NULL PORT DATA") {
+            newTargets = newTargets.filter((v) => { v != data })
+        }
+    }
+
+    return newTargets
+}
+
+function printState(ns, procs, targets) {
+    var procNames = Object.keys(procs)
+    if (procNames.length > 0) {
+        ns.print("Running attacks:")
+        for (const p of procNames) {
+            ns.printf("  %s: %s (s: %d; t: %d; rt: %d; wt: %s)",
+                p,
+                procs[p]["operation"],
+                procs[p]["serverCount"],
+                procs[p]["attackThreads"],
+                procs[p]["requiredThreads"],
+                ns.nFormat(procs[p]["waitTime"] / 1000, "00:00:00"),
+            )
+        }
+    }
+    var idleTargets = []
+    for (const t of targets) {
+        if (!procNames.includes(t)) {
+            idleTargets.push(t)
+        }
+    }
+    if (idleTargets.length > 0) {
+        ns.print("Idle targets:")
+        for (const t of idleTargets) {
+            ns.printf("  %s", t)
+        }
+    }
+
+    let maxAttackScriptSize = ns.getScriptRam("/payload/weaken-only.js")
+    let systemThreads = threadsAvailable(ns, maxAttackScriptSize, false)
+    let idleThreads = threadsAvailable(ns, maxAttackScriptSize, true)
+    ns.printf("System threads: %d (idle); %d (available)", idleThreads, systemThreads)
+}
+
+function isRunning(ns) {
+    var myself = ns.getScriptName()
+    var count = 0
+    for (const proc of ns.ps()) {
+        if (proc.filename == myself) {
+            count++
+        }
+        if (count > 1) {
+            return true
+        }
+    }
+    return false
 }
