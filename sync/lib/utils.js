@@ -236,7 +236,7 @@ export async function buyServers(ns) {
 		return true
 	}
 	let serverCost = ns.getPurchasedServerCost(minRam)
-	while (myMoney(ns) >= serverCost) {
+	while (canAfford(ns, serverCost)) {
 		let name = ns.purchaseServer(prefix, minRam);
 		await deployPayload(ns, name)
 		if (ns.getPurchasedServers().length >= ns.getPurchasedServerLimit()) {
@@ -280,7 +280,7 @@ export async function upgradeServers(ns, ramLimit = 256) {
 		for (const size of ramSizes) {
 			for (const name of servers[size]) {
 				let upgradeCost = ns.getPurchasedServerCost(targetRamSize)
-				if (myMoney(ns) < upgradeCost) {
+				if (!canAfford(ns, upgradeCost)) {
 					// not enough money to further upgrade, stop here
 					return false
 				}
@@ -320,16 +320,38 @@ export function arrayEqual(a, b) {
 	return true
 }
 
+export function setMoneyLimit(ns, val) {
+	var port = getMoneyLimitPort(ns)
+	if (port.empty()) {
+		port.write(val)
+		return
+	}
+	port.read()
+	return
+}
+
+export function getMoneyLimit(ns) {
+	var port = getMoneyLimitPort(ns)
+	if (port.empty()) {
+		return 0
+	}
+	return port.peek()
+}
+
 export function myMoney(ns) {
 	ns.disableLog("getServerMoneyAvailable")
 	return ns.getServerMoneyAvailable("home")
+}
+
+export function canAfford(ns, cost) {
+	return ((myMoney(ns) - cost) >= getMoneyLimit(ns))
 }
 
 export function buyHacknetNodes(ns, nodeLimit) {
 	if (ns.hacknet.numNodes() >= nodeLimit) {
 		return true
 	}
-	while (myMoney(ns) >= ns.hacknet.getPurchaseNodeCost()) {
+	while (canAfford(ns, ns.hacknet.getPurchaseNodeCost())) {
 		ns.hacknet.purchaseNode()
 		if (ns.hacknet.numNodes() >= nodeLimit) {
 			return true
@@ -374,7 +396,7 @@ export function upgradeHacknetNodes(ns, upgrade) {
 			for (const i of nodes[val]) {
 				while (ns.hacknet.getNodeStats(i)[resType] != targetResValue) {
 					var upgradeCost = getCosts(i, 1);
-					if (myMoney(ns) < upgradeCost) {
+					if (!canAfford(ns, upgradeCost)) {
 						// not enough money to further upgrade, stop here
 						return false
 					}
@@ -521,4 +543,8 @@ export function getTargetAddPort(ns) {
 
 export function getTargetRemovePort(ns) {
 	return ns.getPortHandle(2)
+}
+
+export function getMoneyLimitPort(ns) {
+	return ns.getPortHandle(3)
 }
