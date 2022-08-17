@@ -84,9 +84,17 @@ export function filter_minRam(size) {
 	})
 }
 
+export function ramAvail(host) {
+	let reserved = 0
+	if (host.hostname == "home") {
+		reserved = 32
+	}
+	return Math.max(host.maxRam - (host.ramUsed + reserved), 0)
+}
+
 export function filter_minRamAvailable(size) {
 	return (function (host) {
-		return ((host.maxRam - host.ramUsed) >= size)
+		return (ramAvail(host) >= size)
 	})
 }
 
@@ -167,7 +175,7 @@ export function threadsAvailable(ns, threadSize, onlyFree = true) {
 	var threads = 0
 	for (const name in targets) {
 		let target = targets[name]
-		let ram = target.maxRam - target.ramUsed
+		let ram = ramAvail(target)
 		if (!onlyFree) {
 			ram = target.maxRam
 		}
@@ -453,7 +461,7 @@ export async function schedule(ns, script, shouldThreads = 1, args = []) {
 	var target = ""
 	var targetRamAvail = -1
 	for (const name in candidates) {
-		let candidateRamAvail = candidates[name].maxRam - candidates[name].ramUsed
+		let candidateRamAvail = ramAvail(candidates[name])
 		if (candidateRamAvail > targetRamAvail) {
 			target = name
 			targetRamAvail = candidateRamAvail
@@ -483,7 +491,7 @@ export function performAttack(ns, attack, target, attackers) {
 	ns.disableLog("exec")
 	var pids = []
 	for (const name in attackers) {
-		let serverThreads = Math.floor((attackers[name].maxRam - attackers[name].ramUsed) / scriptRam)
+		let serverThreads = Math.floor((ramAvail(attackers[name]) / scriptRam))
 		if (serverThreads > requiredThreads) {
 			serverThreads = requiredThreads
 		}
