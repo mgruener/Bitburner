@@ -336,8 +336,8 @@ export function arrayEqual(a, b) {
 
 export function setMoneyLimit(ns, val) {
 	var port = getMoneyLimitPort(ns)
+	port.write(val)
 	if (port.empty()) {
-		port.write(val)
 		return
 	}
 	port.read()
@@ -474,7 +474,6 @@ export async function schedule(ns, script, shouldThreads = 1, args = []) {
 		}
 	}
 	if (target == "") {
-		ns.tprintf("Failed to schedule '%s': no usable server found", script)
 		return false
 	}
 	if (target != "home") {

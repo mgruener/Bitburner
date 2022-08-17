@@ -66,7 +66,7 @@ export async function main(ns) {
             procs[targetName] = state
         }
         printState(ns, procs, targets)
-        procs = await wait(ns, procs, 10000)
+        procs = await wait(ns, procs, 5000)
         targets = updateTargets(ns, targets)
     }
 }
@@ -113,7 +113,7 @@ async function wait(ns, procs, maxWait) {
             continue
         }
         let newWaitTime = procs[proc]["waitTime"] - waitTime
-        if (newWaitTime <= 0) {
+        if ((newWaitTime <= 0) || !attackStillRunning(ns, procs[proc]["pids"])) {
             continue
         }
         newProcs[proc] = procs[proc]
@@ -191,6 +191,15 @@ function isRunning(ns) {
             count++
         }
         if (count > 1) {
+            return true
+        }
+    }
+    return false
+}
+
+function attackStillRunning(ns, pids) {
+    for (const pid of pids) {
+        if (ns.isRunning(pid)) {
             return true
         }
     }
