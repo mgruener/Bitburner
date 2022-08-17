@@ -11,6 +11,7 @@ import {
     getTargetAddPort,
     getTargetRemovePort,
     threadsAvailable,
+    sortObjectsBy,
 } from "lib/utils.js";
 
 /** @param {import("../..").NS } ns */
@@ -141,7 +142,7 @@ function updateTargets(ns, current) {
         let data = removePort.read()
         // See comment above
         if (data != "NULL PORT DATA") {
-            newTargets = newTargets.filter((v) => { v != data })
+            newTargets = newTargets.filter((v) => v != data)
         }
     }
 
@@ -152,8 +153,8 @@ function printState(ns, procs, targets) {
     var procNames = Object.keys(procs)
     if (procNames.length > 0) {
         ns.print("Running attacks:")
-        for (const p of procNames) {
-            ns.printf("  %s: %s (s: %d; t: %d; rt: %d; wt: %s)",
+        for (const p of procNames.sort()) {
+            ns.printf("  %20s: %6s (s: %3d; t: %6d; rt: %6d; wt: %8s)",
                 p,
                 procs[p]["operation"],
                 procs[p]["serverCount"],

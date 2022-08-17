@@ -112,6 +112,12 @@ export function filter_playerServer(state = true) {
 	})
 }
 
+export function filter_minMaxMoney(amount = 1) {
+	return (function (host) {
+		return (host.moneyMax >= amount)
+	})
+}
+
 export function portOpener(ns) {
 	var portOpener = []
 	if (ns.fileExists("BruteSSH.exe", "home")) {
@@ -555,4 +561,18 @@ export function getTargetRemovePort(ns) {
 
 export function getMoneyLimitPort(ns) {
 	return ns.getPortHandle(3)
+}
+
+export function sortObjectsBy(key, objects) {
+	return [...Object.values(objects)].sort(
+		(x, y) => {
+			if (x[key] < y[key]) {
+				return -1
+			}
+			if (x[key] > y[key]) {
+				return 1
+			}
+			return 0
+		}
+	)
 }
