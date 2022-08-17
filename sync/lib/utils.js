@@ -336,10 +336,11 @@ export function arrayEqual(a, b) {
 
 export function setMoneyLimit(ns, val) {
 	var port = getMoneyLimitPort(ns)
-	port.write(val)
 	if (port.empty()) {
+		port.write(val)
 		return
 	}
+	port.write(val)
 	port.read()
 	return
 }
