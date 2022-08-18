@@ -19,5 +19,6 @@ export async function main(ns) {
             ns.tprintf("Failed to share() on '%s' with %d threads", t, serverThreads)
         }
     }
+    await ns.sleep(2000)
     ns.tprintf("Share power: %f", ns.getSharePower())
 }

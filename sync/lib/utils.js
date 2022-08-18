@@ -496,14 +496,15 @@ export function performAttack(ns, attack, target, attackers) {
 
 	ns.disableLog("exec")
 	var pids = []
-	for (const name in attackers) {
-		let serverThreads = Math.floor((ramAvail(attackers[name]) / scriptRam))
+	var servers = sortObjectBy(attackers, sortByComputePower(requiredThreads))
+	for (const server of servers) {
+		let serverThreads = Math.floor((ramAvail(server) / scriptRam))
 		if (serverThreads > requiredThreads) {
 			serverThreads = requiredThreads
 		}
-		let pid = ns.exec(attack["script"], name, serverThreads, target.hostname, serverThreads)
+		let pid = ns.exec(attack["script"], server.hostname, serverThreads, target.hostname, serverThreads)
 		if (pid == 0) {
-			ns.tprintf("Error while performing '%s' on %s from %s", attack["type"], target.hostname, name)
+			ns.tprintf("Error while performing '%s' on %s from %s", attack["type"], target.hostname, server.hostname)
 			continue
 		}
 		pids.push(pid)
@@ -563,16 +564,72 @@ export function getMoneyLimitPort(ns) {
 	return ns.getPortHandle(3)
 }
 
-export function sortObjectsBy(key, objects) {
-	return [...Object.values(objects)].sort(
-		(x, y) => {
-			if (x[key] < y[key]) {
+export function sortArrayBy(list, sortFunc) {
+	return [...list].sort(sortFunc)
+}
+
+export function sortObjectBy(object, sortFunc) {
+	return [...Object.values(object)].sort(sortFunc)
+}
+
+
+// the function is called with func(elem[key])
+export function sortByFunctionValue(func, key) {
+	return (function (x, y) {
+		if (func(x[key]) < func(y[key])) {
+			return -1
+		}
+		if (func(x[key]) > func(y[key])) {
+			return 1
+		}
+		return 0
+	})
+}
+
+export function sortByKey(key) {
+	return (function (x, y) {
+		if (x[key] < y[key]) {
+			return -1
+		}
+		if (x[key] > y[key]) {
+			return 1
+		}
+		return 0
+	})
+}
+
+export function sortByComputePower(fullSize) {
+	return (function (x, y) {
+		let xAvail = ramAvail(x)
+		let yAvail = ramAvail(y)
+		let xDiff = Math.max(fullSize - xAvail, 0)
+		let yDiff = Math.max(fullSize - yAvail, 0)
+		if ((xDiff <= 0) && !(yDiff <= 0)) {
+			return -1
+		}
+		if (!(xDiff <= 0) && (yDiff <= 0)) {
+			return 1
+		}
+		if ((xDiff == 0) && (yDiff == 0)) {
+			if (x.cpuCores > y.cpuCores) {
 				return -1
 			}
-			if (x[key] > y[key]) {
+			if (x.cpuCores < y.cpuCores) {
 				return 1
 			}
-			return 0
+			if (xAvail < yAvail) {
+				return -1
+			}
+			if (xAvail > yAvail) {
+				return 1
+			}
 		}
-	)
+		if (xAvail > yAvail) {
+			return -1
+		}
+		if (xAvail < yAvail) {
+			return 1
+		}
+		return 0
+	})
 }
