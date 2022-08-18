@@ -11,6 +11,8 @@ import {
     getTargetAddPort,
     getTargetRemovePort,
     threadsAvailable,
+    sortObjectBy,
+    sortByKey,
 } from "lib/utils.js";
 
 /** @param {import("../..").NS } ns */
@@ -149,17 +151,18 @@ function updateTargets(ns, current) {
 }
 
 function printState(ns, procs, targets) {
-    var procNames = Object.keys(procs)
-    if (procNames.length > 0) {
+    var procNames = [...Object.keys(procs)].sort()
+    var sortedProcs = sortObjectBy(procs, sortByKey("waitTime"))
+    if (sortedProcs.length > 0) {
         ns.print("Running attacks:")
-        for (const p of procNames.sort()) {
+        for (const proc of sortedProcs) {
             ns.printf("  %20s: %6s (s: %3d; t: %6d; rt: %6d; wt: %8s)",
-                p,
-                procs[p]["operation"],
-                procs[p]["serverCount"],
-                procs[p]["attackThreads"],
-                procs[p]["requiredThreads"],
-                ns.nFormat(procs[p]["waitTime"] / 1000, "00:00:00"),
+                proc["target"],
+                proc["operation"],
+                proc["serverCount"],
+                proc["attackThreads"],
+                proc["requiredThreads"],
+                ns.nFormat(proc["waitTime"] / 1000, "00:00:00"),
             )
         }
     }

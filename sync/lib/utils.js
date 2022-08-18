@@ -200,7 +200,7 @@ export function getWeakenThreads(ns, server, attacker = server) {
 	// required amount of threads with the proper amount of cpu cores to optimize
 	// the resource usage
 	if ((threadsAvail >= threadsRequired) && (attacker.cpuCores > 1)) {
-		return Math.ceil(targetAmount / ns.weakenAnalyze(attacker.cpuCores))
+		return Math.ceil(targetAmount / ns.weakenAnalyze(1, attacker.cpuCores))
 	}
 	return threadsRequired
 }
@@ -209,21 +209,21 @@ export function getGrowThreads(ns, server, attacker = server) {
 	// 1.75GB is the size of the simplest grow script
 	var threadsAvail = ramAvail(attacker) / 1.75
 	var money = server.moneyAvailable
-	// The server is "empty", which means the Bitburner code assumes $1 per thread as basis.
-	// See https://steamcommunity.com/app/1812820/discussions/0/5545618081297574632/#c3200369112086161192.
-	// Nevertheless, this is only true for the first attacker in a distributed attack,
-	// as the game does all its calculations for grow(), weaken() and hack() AFTER the wait time
-	// for the call which means in a distributed attack, each attack ending influences the attacks
-	// ending after that one even if they were all started under the same conditions
+	// If we made a mistake and fully drained a server, we assume the
+	// we need 1000 threads, which is the same as assuming the server has $1000.
+	// Normally, with a non-drained server the whole setup looks like this:
+	//   threads = growthAnalyze(moneyMax / moneyAvail)
+	//   maxMoney = moneyAvail + (moneyAvail * growPercent(threads))
+	// With a drained server this becomes
+	//   threads = growthAnalyze(moneyMax / threads)
+	//   maxMoney = threads + (threads * formulas.growPercent(threads))
+	// Because for a drained server, grow() assumes $1 for each thread.
+	// As in this case the input of growthAnalyze depends on its output, we cannot use it.
+	// And without "cheating" (i.e. extracting the actual growPercent calculation from the source),
+	// we have no way of reliably calculating the amount of threads needed for 
+	// a drained server, so we assume a more or less arbitrary amount.
 	if (money <= 0) {
-		money = threadsAvailable
-		// Edge case, if there are more attack threads available than the maximum
-		// amount of money on the server. No idea how the game handles that, but lets
-		// just assume $1 per thread holds true and return one thread for each dollar
-		// we want
-		if (threadsAvailable > server.moneyMax) {
-			return server.moneyMax
-		}
+		return 1000
 	}
 	var growFactor = server.moneyMax / money
 	var threadsRequired = Math.ceil(ns.growthAnalyze(server.hostname, growFactor))
@@ -238,8 +238,15 @@ export function getGrowThreads(ns, server, attacker = server) {
 }
 
 export function getHackThreads(ns, server) {
-	var money = server.moneyAvailable
-	var hackThreads = Math.ceil(ns.hackAnalyzeThreads(server.hostname, money))
+	// Don't ever fully drain a server.
+	// The amount of money created by grow() is based on the
+	// moneyAvailable on the server. If moneyAvailable == 0,
+	// grow() assumes the server has $1 for each thread it is called
+	// with, making it impossible (for my; mayby just complicated for someone else)
+	// to determine the amount of threads required to grow a server to a given amount.
+	// Always reserve 1% of money on the server.
+	var money = server.moneyAvailable - (server.moneyAvailable * 0.01)
+	var hackThreads = Math.floor(ns.hackAnalyzeThreads(server.hostname, money))
 	if (isFinite(hackThreads)) {
 		return hackThreads
 	}
@@ -290,6 +297,51 @@ export async function buyServers(ns) {
 	return false
 }
 
+export function getServersByRam(ns) {
+	var servers = {}
+	for (const name of ns.getPurchasedServers()) {
+		let ram = ns.getServerMaxRam(name)
+		if (ram in servers) {
+			servers[ram].push(name)
+			continue
+		}
+		servers[ram] = [name]
+	}
+	return servers
+}
+
+export function maxServerUpgrade(ns) {
+	var maxUpgrade = ns.getPurchasedServerMaxRam()
+	var maxUpgradeCost = ns.getPurchasedServerLimit() * ns.getPurchasedServerCost(maxUpgrade)
+	while (!canAfford(ns, maxUpgradeCost) && (maxUpgrade > 4)) {
+		maxUpgrade = maxUpgrade / 2
+		maxUpgradeCost = ns.getPurchasedServerLimit() * ns.getPurchasedServerCost(maxUpgrade)
+	}
+	return maxUpgrade
+}
+
+export async function bulkServerUpgrade(ns, ramLimit = ns.getPurchasedServerMaxRam()) {
+	let prefix = ns.sprintf("pserv-%d", ramLimit)
+	if (canAfford(ns, ns.getPurchasedServerLimit() * ns.getPurchasedServerCost(ramLimit))) {
+		// clean up the old stuff
+		for (const name of ns.getPurchasedServers()) {
+			if (ns.getServer(name).maxRam < ramLimit) {
+				ns.killall(name, false)
+				ns.deleteServer(name)
+			}
+		}
+		while (ns.getPurchasedServers().length < ns.getPurchasedServerLimit()) {
+			let newName = ns.purchaseServer(prefix, ramLimit);
+			if (newName == "") {
+				return false
+			}
+			await deployPayload(ns, newName)
+		}
+		return true
+	}
+	return false
+}
+
 export async function upgradeServers(ns, ramLimit = 256) {
 	var maxServers = ns.getPurchasedServerLimit()
 	// someday
@@ -302,15 +354,7 @@ export async function upgradeServers(ns, ramLimit = 256) {
 
 	var servers = {}
 	while (!(ramLimit in servers) || (servers[ramLimit].length < maxServers)) {
-		servers = {}
-		for (const name of ns.getPurchasedServers()) {
-			let ram = ns.getServerMaxRam(name)
-			if (ram in servers) {
-				servers[ram].push(name)
-				continue
-			}
-			servers[ram] = [name]
-		}
+		servers = getServersByRam(ns)
 		let ramSizes = [...Object.keys(servers)].sort((a, b) => a - b)
 		let maxRamSize = ramSizes[ramSizes.length - 1]
 		let targetRamSize = Math.min(maxRamSize * 2, ramLimit)
@@ -332,6 +376,7 @@ export async function upgradeServers(ns, ramLimit = 256) {
 				ns.deleteServer(name)
 				let newName = ns.purchaseServer(prefix, targetRamSize);
 				await deployPayload(ns, newName)
+				await ns.sleep(100)
 			}
 		}
 	}
@@ -405,7 +450,7 @@ export function buyHacknetNodes(ns, nodeLimit) {
 	return false
 }
 
-export function upgradeHacknetNodes(ns, upgrade) {
+export async function upgradeHacknetNodes(ns, upgrade) {
 	var nodeLimit = upgrade["nodeLimit"]
 	var resType = upgrade["type"]
 	var resLimit = upgrade["limit"]
@@ -447,6 +492,7 @@ export function upgradeHacknetNodes(ns, upgrade) {
 					}
 					doUpgrade(i, 1);
 				}
+				await ns.sleep(50)
 			}
 		}
 	}
@@ -558,6 +604,7 @@ export function performAttack(ns, attack, target, attackers) {
 		"operation": attack["type"],
 		"serverCount": serverCount,
 		"pids": pids,
+		"target": target.hostname,
 	}
 }
 

@@ -7,6 +7,9 @@ import {
     getHacknetCoreUpgrade,
     getHacknetLevelUpgrade,
     schedule,
+    getServersByRam,
+    maxServerUpgrade,
+    bulkServerUpgrade,
 } from "lib/utils.js";
 
 /** @param {import("../..").NS } ns */
@@ -30,22 +33,35 @@ export async function main(ns) {
     }
 
     while (completed.length < expected) {
-        if (await buyServers(ns)) {
-            markCompleted("buyServers")
-        }
-        if (await upgradeServers(ns, serverRamLimit)) {
-            markCompleted("upgradeServers")
+        let maxUpgrade = maxServerUpgrade(ns) > serverRamLimit ? serverRamLimit : maxServerUpgrade(ns)
+        let serversByRam = getServersByRam(ns)
+        let serverCount = ns.getPurchasedServers()
+        let largestServer = serverCount > 0 ? Object.keys(serversByRam).sort()[0] : 0
+
+        if ((maxUpgrade > 4) && (maxUpgrade > largestServer)) {
+            if (await bulkServerUpgrade(ns, maxUpgrade) && maxUpgrade >= serverRamLimit) {
+                markCompleted("buyServers")
+                markCompleted("upgradeServers")
+            }
+
+        } else {
+            if (await buyServers(ns)) {
+                markCompleted("buyServers")
+            }
+            if (await upgradeServers(ns, serverRamLimit)) {
+                markCompleted("upgradeServers")
+            }
         }
         if (buyHacknetNodes(ns, hacknetNodeLimit)) {
             markCompleted("buyHacknetNodes")
         }
-        if (upgradeHacknetNodes(ns, hacknetRamUpgrade)) {
+        if (await upgradeHacknetNodes(ns, hacknetRamUpgrade)) {
             markCompleted("buyHacknetRam")
         }
-        if (upgradeHacknetNodes(ns, hacknetCoreUpgrade)) {
+        if (await upgradeHacknetNodes(ns, hacknetCoreUpgrade)) {
             markCompleted("buyHacknetCores")
         }
-        if (upgradeHacknetNodes(ns, hacknetLevelUpgrade)) {
+        if (await upgradeHacknetNodes(ns, hacknetLevelUpgrade)) {
             markCompleted("buyHacknetLevel")
         }
         if (!await schedule(ns, "/scripts/backdoor-worm.js")) {

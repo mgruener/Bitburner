@@ -44,7 +44,7 @@ export async function main(ns) {
             continue
         }
         ns.tprintf(
-            "%20s: score: %s; m: %8s; gr: %4d; sm: %3d; wt: %10d; gt: %10d; ht: %10d",
+            "%20s: score: %8s; m: %8s; gr: %4d; sm: %3d; wt: %10d; gt: %10d; ht: %10d",
             server.hostname,
             ns.nFormat(serverScore(server), '0.00e+0'),
             ns.nFormat(server.moneyMax, "($0.00a)"),
