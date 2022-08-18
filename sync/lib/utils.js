@@ -227,7 +227,7 @@ export async function deployPayload(ns, name) {
 		"/payload/weaken-only.js",
 		"/payload/share.js",
 	]
-	await ns.scp(files, "home", name)
+	await ns.scp(files, name, "home")
 }
 
 export function getAdditionalServerInfo(ns, server) {
@@ -478,8 +478,8 @@ export async function schedule(ns, script, shouldThreads = 1, args = []) {
 		return false
 	}
 	if (target != "home") {
-		await ns.scp("/lib/utils.js", "home", target)
-		await ns.scp(script, "home", target)
+		await ns.scp("/lib/utils.js", target, "home")
+		await ns.scp(script, target, "home")
 	}
 	var maxThreads = Math.floor(targetRamAvail / size)
 	var execThreads = threads < 0 ? maxThreads : threads

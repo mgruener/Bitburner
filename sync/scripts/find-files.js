@@ -30,7 +30,7 @@ export async function main(ns) {
             for (const f of result) {
                 ns.tprintf("  %s", f)
                 if (f.endsWith(".lit")) {
-                    await ns.scp(f, t, "home")
+                    await ns.scp(f, "home", t)
                 }
             }
         }

@@ -47,6 +47,6 @@ async function attack(ns, target) {
     ns.nuke(target.hostname)
 
     // if (!target.backdoorInstalled) {
-    //     await ns.installBackdoor(target.hostname)
+    //     await ns.singularity.installBackdoor(target.hostname)
     // }
 }
