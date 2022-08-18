@@ -191,20 +191,50 @@ export function threadsAvailable(ns, threadSize, onlyFree = true) {
 	return threads
 }
 
-export function getWeakenThreads(ns, server) {
+export function getWeakenThreads(ns, server, attacker = server) {
+	var threadsAvail = ramAvail(attacker) / 1.75
 	var targetAmount = Math.max(server.hackDifficulty - server.minDifficulty, 0)
-	var weakenThreads = Math.ceil(targetAmount / ns.weakenAnalyze(1))
-	return weakenThreads
+	var threadsRequired = Math.ceil(targetAmount / ns.weakenAnalyze(1))
+	// if the provided attacker has enough compute power to perform the full weaken
+	// with one core in one go although it has more than one core, re-calculate the
+	// required amount of threads with the proper amount of cpu cores to optimize
+	// the resource usage
+	if ((threadsAvail >= threadsRequired) && (attacker.cpuCores > 1)) {
+		return Math.ceil(targetAmount / ns.weakenAnalyze(attacker.cpuCores))
+	}
+	return threadsRequired
 }
 
-// according to https://steamcommunity.com/app/1812820/discussions/0/5545618081297574632/#c3200369112086161192
-// grow() adds $1 for each thread if the server has $0 available so providing
-// an estimated thread count, we get a better estimate of actual threads
-// needed in that case
-export function getGrowThreads(ns, server, threadsAvailable = 1) {
-	var money = server.moneyAvailable <= 0 ? Math.max(threadsAvailable, 1) : server.moneyAvailable
+export function getGrowThreads(ns, server, attacker = server) {
+	// 1.75GB is the size of the simplest grow script
+	var threadsAvail = ramAvail(attacker) / 1.75
+	var money = server.moneyAvailable
+	// The server is "empty", which means the Bitburner code assumes $1 per thread as basis.
+	// See https://steamcommunity.com/app/1812820/discussions/0/5545618081297574632/#c3200369112086161192.
+	// Nevertheless, this is only true for the first attacker in a distributed attack,
+	// as the game does all its calculations for grow(), weaken() and hack() AFTER the wait time
+	// for the call which means in a distributed attack, each attack ending influences the attacks
+	// ending after that one even if they were all started under the same conditions
+	if (money <= 0) {
+		money = threadsAvailable
+		// Edge case, if there are more attack threads available than the maximum
+		// amount of money on the server. No idea how the game handles that, but lets
+		// just assume $1 per thread holds true and return one thread for each dollar
+		// we want
+		if (threadsAvailable > server.moneyMax) {
+			return server.moneyMax
+		}
+	}
 	var growFactor = server.moneyMax / money
-	return Math.ceil(ns.growthAnalyze(server.hostname, growFactor))
+	var threadsRequired = Math.ceil(ns.growthAnalyze(server.hostname, growFactor))
+	// if the provided attacker has enough compute power to perform the full grow
+	// with one core in one go although it has more than one core, re-calculate the
+	// required amount of threads with the proper amount of cpu cores to optimize
+	// the resource usage
+	if ((threadsAvail >= threadsRequired) && (attacker.cpuCores > 1)) {
+		return Math.ceil(ns.growthAnalyze(server.hostname, growFactor, attacker.cpuCores))
+	}
+	return threadsRequired
 }
 
 export function getHackThreads(ns, server) {
@@ -230,14 +260,14 @@ export async function deployPayload(ns, name) {
 	await ns.scp(files, name, "home")
 }
 
-export function getAdditionalServerInfo(ns, server) {
+export function getAdditionalServerInfo(ns, server, attacker = server) {
 	var moneyThreshold = server.moneyMax * 0.75
 	var securityThreshold = server.minDifficulty + 5
 	var result = {
 		moneyThreshold: moneyThreshold,
 		securityThreshold: securityThreshold,
-		weakenThreads: getWeakenThreads(ns, server),
-		growThreads: getGrowThreads(ns, server, threadsAvailable(ns, 1.75)),
+		weakenThreads: getWeakenThreads(ns, server, attacker),
+		growThreads: getGrowThreads(ns, server, attacker),
 		hackThreads: getHackThreads(ns, server)
 	}
 	return result
@@ -488,15 +518,21 @@ export async function schedule(ns, script, shouldThreads = 1, args = []) {
 
 export function performAttack(ns, attack, target, attackers) {
 	var addonInfo = getAdditionalServerInfo(ns, target)
-	var waitTime = attack["wait"](target.hostname) + 25
 	var requiredThreads = addonInfo[attack["threads"]]
+	var waitTime = attack["wait"](target.hostname) + 25
 	var attackThreads = 0
 	var serverCount = 0
 	var scriptRam = ns.getScriptRam(attack["script"])
 
 	ns.disableLog("exec")
 	var pids = []
+	// this sorts the servers according to the amount of threads required by
+	// a single core system (assuming that all attackable systems are single core)...
 	var servers = sortObjectBy(attackers, sortByComputePower(requiredThreads))
+	// ...lets see if we can reduce the amount of threads required by re-calculating
+	// this with the most suitable attacker
+	addonInfo = getAdditionalServerInfo(ns, target, servers[0])
+	requiredThreads = addonInfo[attack["threads"]]
 	for (const server of servers) {
 		let serverThreads = Math.floor((ramAvail(server) / scriptRam))
 		if (serverThreads > requiredThreads) {

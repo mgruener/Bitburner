@@ -3,6 +3,7 @@ import {
     filter_minRamAvailable,
     getAllServers,
     applyFilter,
+    ramAvail,
 } from "lib/utils.js";
 
 /** @param {import("../..").NS } ns */
@@ -14,7 +15,14 @@ export async function main(ns) {
     var targets = getAllServers(ns)
     targets = applyFilter(targets, [hasAdminFilter, ramFilter], false, false)
     for (const t in targets) {
-        let serverThreads = Math.floor((targets[t].maxRam - targets[t].ramUsed) / scriptRam)
+        // we don't ever want to use home to boost faction gain as the compute
+        // power there is way to valuable for that. Given a large enough size
+        // later in the game, most attacks are executed from home, so we can use
+        // all other compute power for sharing.
+        if (targets[t].hostname == "home") {
+            continue
+        }
+        let serverThreads = Math.floor(ramAvail(targets[t]) / scriptRam)
         if (ns.exec(script, t, serverThreads) == 0) {
             ns.tprintf("Failed to share() on '%s' with %d threads", t, serverThreads)
         }

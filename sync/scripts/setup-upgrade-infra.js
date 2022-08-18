@@ -13,7 +13,10 @@ import {
 export async function main(ns) {
     var expected = 6
     var completed = []
-    var serverRamLimit = 4096
+    // with the ability to set a money limit with
+    // the money-limit.js script, there is no need
+    // to limit the size of our compute nodes here
+    var serverRamLimit = ns.getPurchasedServerMaxRam()
     var hacknetNodeLimit = 8
     var hacknetRamUpgrade = getHacknetRamUpgrade(ns, hacknetNodeLimit)
     var hacknetCoreUpgrade = getHacknetCoreUpgrade(ns, hacknetNodeLimit)
