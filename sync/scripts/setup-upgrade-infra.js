@@ -58,11 +58,15 @@ export async function main(ns) {
         if (await upgradeHacknetNodes(ns, hacknetRamUpgrade)) {
             markCompleted("buyHacknetRam")
         }
-        if (await upgradeHacknetNodes(ns, hacknetCoreUpgrade)) {
-            markCompleted("buyHacknetCores")
-        }
-        if (await upgradeHacknetNodes(ns, hacknetLevelUpgrade)) {
-            markCompleted("buyHacknetLevel")
+        // only start upgrading hacknet when we at least have
+        // a basic set of purchased servers
+        if (completed.includes("buyServers")) {
+            if (await upgradeHacknetNodes(ns, hacknetCoreUpgrade)) {
+                markCompleted("buyHacknetCores")
+            }
+            if (await upgradeHacknetNodes(ns, hacknetLevelUpgrade)) {
+                markCompleted("buyHacknetLevel")
+            }
         }
         if (!await schedule(ns, "/scripts/backdoor-worm.js")) {
             ns.print("Failed to execute backdoor-worm")
