@@ -267,9 +267,13 @@ export async function deployPayload(ns, name) {
 	await ns.scp(files, name, "home")
 }
 
+export function hasFormulas(ns) {
+	return ns.fileExists("Formulas.exe", "home")
+}
+
 export function maxRegrowAmount(ns, server, secThreshold, cores = 1) {
 	var threadsAvail = threadsAvailable(ns, 1.7, false)
-	if (!ns.fileExists("Formulas.exe", "home")) {
+	if (!hasFormulas(ns)) {
 		return server.moneyMax - server.moneyAvailable
 	}
 	var srv = { ...server }
