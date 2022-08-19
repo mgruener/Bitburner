@@ -14,6 +14,11 @@ import {
 
 /** @param {import("../..").NS } ns */
 export async function main(ns) {
+    var count = Infinity
+    if (ns.args.length > 0) {
+        count = parseInt(ns.args[0])
+    }
+
     var expected = 6
     var completed = []
     // with the ability to set a money limit with
@@ -22,6 +27,7 @@ export async function main(ns) {
     var serverRamLimit = ns.getPurchasedServerMaxRam()
     var hacknetNodeLimit = 8
     var hacknetRamUpgrade = getHacknetRamUpgrade(ns, hacknetNodeLimit)
+    var doHacknet = false
     var hacknetCoreUpgrade = getHacknetCoreUpgrade(ns, hacknetNodeLimit)
     var hacknetLevelUpgrade = getHacknetLevelUpgrade(ns, hacknetNodeLimit)
 
@@ -32,12 +38,13 @@ export async function main(ns) {
         }
     }
 
-    while (completed.length < expected) {
+    while ((completed.length < expected) && (count > 0)) {
         let maxUpgrade = maxServerUpgrade(ns) > serverRamLimit ? serverRamLimit : maxServerUpgrade(ns)
         let serversByRam = getServersByRam(ns)
-        let serverCount = ns.getPurchasedServers()
+        let serverCount = ns.getPurchasedServers().length
         let largestServer = serverCount > 0 ? Object.keys(serversByRam).sort()[0] : 0
 
+        ns.printf("MaxUpgrade: %d; largest Server: %d", maxUpgrade, largestServer)
         if ((maxUpgrade > 4) && (maxUpgrade > largestServer)) {
             if (await bulkServerUpgrade(ns, maxUpgrade) && maxUpgrade >= serverRamLimit) {
                 markCompleted("buyServers")
@@ -60,7 +67,7 @@ export async function main(ns) {
         }
         // only start upgrading hacknet when we at least have
         // a basic set of purchased servers
-        if (completed.includes("buyServers")) {
+        if (completed.includes("buyServers") && doHacknet) {
             if (await upgradeHacknetNodes(ns, hacknetCoreUpgrade)) {
                 markCompleted("buyHacknetCores")
             }
@@ -71,6 +78,9 @@ export async function main(ns) {
         if (!await schedule(ns, "/scripts/backdoor-worm.js")) {
             ns.print("Failed to execute backdoor-worm")
         }
-        await ns.sleep(10000)
+        count--
+        if (count > 0) {
+            await ns.sleep(10000)
+        }
     }
 }
