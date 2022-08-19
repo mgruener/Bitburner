@@ -19,7 +19,6 @@ export async function main(ns) {
         count = parseInt(ns.args[0])
     }
 
-    var expected = 6
     var completed = []
     // with the ability to set a money limit with
     // the money-limit.js script, there is no need
@@ -28,6 +27,7 @@ export async function main(ns) {
     var hacknetNodeLimit = 8
     var hacknetRamUpgrade = getHacknetRamUpgrade(ns, hacknetNodeLimit)
     var doHacknet = false
+    var expected = doHacknet ? 6 : 2
     var hacknetCoreUpgrade = getHacknetCoreUpgrade(ns, hacknetNodeLimit)
     var hacknetLevelUpgrade = getHacknetLevelUpgrade(ns, hacknetNodeLimit)
 
@@ -59,15 +59,15 @@ export async function main(ns) {
                 markCompleted("upgradeServers")
             }
         }
-        if (buyHacknetNodes(ns, hacknetNodeLimit)) {
-            markCompleted("buyHacknetNodes")
-        }
-        if (await upgradeHacknetNodes(ns, hacknetRamUpgrade)) {
-            markCompleted("buyHacknetRam")
-        }
         // only start upgrading hacknet when we at least have
         // a basic set of purchased servers
         if (completed.includes("buyServers") && doHacknet) {
+            if (buyHacknetNodes(ns, hacknetNodeLimit)) {
+                markCompleted("buyHacknetNodes")
+            }
+            if (await upgradeHacknetNodes(ns, hacknetRamUpgrade)) {
+                markCompleted("buyHacknetRam")
+            }
             if (await upgradeHacknetNodes(ns, hacknetCoreUpgrade)) {
                 markCompleted("buyHacknetCores")
             }

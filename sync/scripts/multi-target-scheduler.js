@@ -38,7 +38,8 @@ export async function main(ns) {
         return
     }
 
-    let procs = {}
+    var procs = {}
+    var startDate = new Date()
     while (true) {
         let schedulables = getSchedulables(targets, procs)
         // check if there is anything to schedule and if not,
@@ -66,7 +67,9 @@ export async function main(ns) {
             procs[targetName] = state
         }
         printState(ns, procs, targets)
-        procs = await wait(ns, procs, 1000)
+        let waitResult = await wait(ns, procs, startDate, 1000)
+        procs = waitResult["procs"]
+        startDate = waitResult["startDate"]
         targets = updateTargets(ns, targets)
     }
 }
@@ -90,36 +93,28 @@ function getSchedulables(targets, procs) {
     return schedulables
 }
 
-async function wait(ns, procs, maxWait) {
+async function wait(ns, procs, startDate = new Date(), waitTime = 1000) {
     var newProcs = {}
-    var waitOn = ""
-    var waitTime = Infinity
-    for (const proc in procs) {
-        let procWait = procs[proc]["waitTime"]
-        if (procWait < waitTime) {
-            waitOn = proc
-            waitTime = procWait
-        }
-    }
-    if (waitTime > maxWait) {
-        waitOn = ""
-        waitTime = maxWait
-    }
-
     ns.printf("Sleeping for %s", ns.tFormat(waitTime))
-    await ns.sleep(waitTime)
+    var endDate = new Date()
+    var timeDiff = endDate.getTime() - startDate.getTime()
+    await ns.sleep(Math.max(waitTime - timeDiff, 100))
+    var newStartDate = new Date()
     for (const proc in procs) {
-        if (proc == waitOn) {
-            continue
-        }
         let newWaitTime = procs[proc]["waitTime"] - waitTime
-        if ((newWaitTime <= 0) || !attackStillRunning(ns, procs[proc]["pids"])) {
+        let pids = procs[proc]["pids"]
+        let newPids = [...pids].filter((p) => ns.isRunning(p))
+        if (newPids.length < 1) {
             continue
         }
         newProcs[proc] = procs[proc]
+        newProcs[proc]["pids"] = newPids
         newProcs[proc]["waitTime"] = newWaitTime
     }
-    return newProcs
+    return {
+        "procs": newProcs,
+        "startDate": newStartDate,
+    }
 }
 
 function updateTargets(ns, current) {
@@ -155,9 +150,10 @@ function printState(ns, procs, targets) {
     if (sortedProcs.length > 0) {
         ns.print("Running attacks:")
         for (const proc of sortedProcs) {
-            ns.printf("  %20s: %6s (s: %3d; t: %6d; rt: %6d; wt: %8s)",
+            ns.printf("  %20s: %6s (s: %3d / %3d; t: %6d; rt: %6d; wt: %8s)",
                 proc["target"],
                 proc["operation"],
+                proc["pids"].length,
                 proc["serverCount"],
                 proc["attackThreads"],
                 proc["requiredThreads"],
@@ -192,15 +188,6 @@ function isRunning(ns) {
             count++
         }
         if (count > 1) {
-            return true
-        }
-    }
-    return false
-}
-
-function attackStillRunning(ns, pids) {
-    for (const pid of pids) {
-        if (ns.isRunning(pid)) {
             return true
         }
     }
