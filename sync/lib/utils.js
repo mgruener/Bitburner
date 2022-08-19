@@ -237,7 +237,7 @@ export function getGrowThreads(ns, server, attacker = server) {
 	return threadsRequired
 }
 
-export function getHackThreads(ns, server) {
+export function getHackThreads(ns, server, maxAmount = Infinity) {
 	// Don't ever fully drain a server.
 	// The amount of money created by grow() is based on the
 	// moneyAvailable on the server. If moneyAvailable == 0,
@@ -245,7 +245,7 @@ export function getHackThreads(ns, server) {
 	// with, making it impossible (for my; mayby just complicated for someone else)
 	// to determine the amount of threads required to grow a server to a given amount.
 	// Always reserve 1% of money on the server.
-	var money = server.moneyAvailable - (server.moneyAvailable * 0.01)
+	var money = Math.min(maxAmount, server.moneyAvailable - (server.moneyAvailable * 0.01))
 	var hackThreads = Math.floor(ns.hackAnalyzeThreads(server.hostname, money))
 	if (isFinite(hackThreads)) {
 		return hackThreads
@@ -286,14 +286,14 @@ export function getAdditionalServerInfo(ns, server, attacker = server) {
 		"securityThreshold": securityThreshold,
 		"weakenThreads": getWeakenThreads(ns, server, attacker),
 		"growThreads": getGrowThreads(ns, server, attacker),
-		"hackThreads": getHackThreads(ns, server),
+		"hackThreads": getHackThreads(ns, server, maxRegrow),
 		"maxRegrowAmount": maxRegrow,
 	}
 	return result
 }
 
 export async function buyServers(ns) {
-	const minRam = 8
+	const minRam = 64
 	let prefix = ns.sprintf("pserv-%d", minRam)
 	if (ns.getPurchasedServers().length >= ns.getPurchasedServerLimit()) {
 		return true
