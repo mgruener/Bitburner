@@ -56,18 +56,17 @@ export async function main(ns) {
                 continue
             }
 
-            let state = {}
+            var nextAttack = hackAttack
             if (target.hackDifficulty > addonInfo.securityThreshold) {
-                state = performAttack(ns, weakenAttack, target, attackers)
-            } else if (target.moneyAvailable < addonInfo.moneyThreshold) {
-                state = performAttack(ns, growAttack, target, attackers)
-            } else {
-                state = performAttack(ns, hackAttack, target, attackers)
+                nextAttack = weakenAttack
+            } else if (target.moneyAvailable <= addonInfo.moneyThreshold) {
+                nextAttack = growAttack
             }
+            var state = performAttack(ns, nextAttack, target, attackers)
             procs[targetName] = state
         }
         printState(ns, procs, targets)
-        procs = await wait(ns, procs, 5000)
+        procs = await wait(ns, procs, 1000)
         targets = updateTargets(ns, targets)
     }
 }

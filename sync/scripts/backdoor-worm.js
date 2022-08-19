@@ -33,6 +33,10 @@ export async function main(ns) {
         ns.printf("Deploying payload on Target: %s", targets[t].hostname)
         await deployPayload(ns, t)
     }
+    for (const name of ns.getPurchasedServers()) {
+        ns.printf("Deploying payload on Target: %s", name)
+        await deployPayload(ns, name)
+    }
 }
 
 async function attack(ns, target) {
