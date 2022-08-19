@@ -267,15 +267,27 @@ export async function deployPayload(ns, name) {
 	await ns.scp(files, name, "home")
 }
 
+export function maxRegrowAmount(ns, server, secThreshold, cores = 1) {
+	var threadsAvail = threadsAvailable(ns, 1.7, false)
+	if (!ns.fileExists("Formulas.exe", "home")) {
+		return server.moneyMax - server.moneyAvailable
+	}
+	var srv = { ...server }
+	srv.hackDifficulty = secThreshold
+	return (server.moneyAvailable * ns.formulas.hacking.growPercent(srv, threadsAvail, ns.getPlayer(), cores)) - server.moneyAvailable
+}
+
 export function getAdditionalServerInfo(ns, server, attacker = server) {
 	var moneyThreshold = server.moneyMax * 0.75
 	var securityThreshold = server.minDifficulty + 5
+	var maxRegrow = maxRegrowAmount(ns, server, securityThreshold, attacker.cpuCores)
 	var result = {
-		moneyThreshold: moneyThreshold,
-		securityThreshold: securityThreshold,
-		weakenThreads: getWeakenThreads(ns, server, attacker),
-		growThreads: getGrowThreads(ns, server, attacker),
-		hackThreads: getHackThreads(ns, server)
+		"moneyThreshold": moneyThreshold,
+		"securityThreshold": securityThreshold,
+		"weakenThreads": getWeakenThreads(ns, server, attacker),
+		"growThreads": getGrowThreads(ns, server, attacker),
+		"hackThreads": getHackThreads(ns, server),
+		"maxRegrowAmount": maxRegrow,
 	}
 	return result
 }

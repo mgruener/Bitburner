@@ -59,7 +59,7 @@ export async function main(ns) {
             var nextAttack = hackAttack
             if (target.hackDifficulty > addonInfo.securityThreshold) {
                 nextAttack = weakenAttack
-            } else if (target.moneyAvailable <= addonInfo.moneyThreshold) {
+            } else if (target.moneyAvailable < addonInfo.moneyThreshold) {
                 nextAttack = growAttack
             }
             var state = performAttack(ns, nextAttack, target, attackers)
