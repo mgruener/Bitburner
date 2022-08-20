@@ -2,7 +2,6 @@ import {
     applyFilter,
     filter_adminRights,
     filter_minRamAvailable,
-    getAdditionalServerInfo,
     getAllServers,
     performAttack,
     getGrowAttack,
@@ -49,7 +48,6 @@ export async function main(ns) {
         }
         for (const targetName of schedulables) {
             let target = ns.getServer(targetName)
-            let addonInfo = getAdditionalServerInfo(ns, target)
             let attackers = getAttackers(ns)
 
             // no attackers available, skip this scheduling cycle
@@ -58,9 +56,9 @@ export async function main(ns) {
             }
 
             var nextAttack = hackAttack
-            if (target.hackDifficulty > addonInfo.securityThreshold) {
+            if (target.hackDifficulty > target.securityThreshold) {
                 nextAttack = weakenAttack
-            } else if (target.moneyAvailable < addonInfo.moneyThreshold) {
+            } else if (target.moneyAvailable < target.moneyThreshold) {
                 nextAttack = growAttack
             }
             var state = performAttack(ns, nextAttack, target, attackers)

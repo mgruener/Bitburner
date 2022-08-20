@@ -5,9 +5,11 @@ import {
 
 /** @param {import("../..").NS } ns */
 export async function main(ns) {
+    const hackScheduler = "/scripts/multi-target-scheduler.js"
     ns.exec("/scripts/backdoor-worm.js", "home")
-    var schedulerPid = ns.exec("/scripts/multi-target-scheduler.js", "home")
-    ns.tail(schedulerPid)
+    if (!ns.scriptRunning(hackScheduler, "home")) {
+        ns.tail(ns.exec(hackScheduler, "home"))
+    }
 
     var portOpenerSeen = portOpener(ns).length
     while (true) {
@@ -17,29 +19,28 @@ export async function main(ns) {
             portOpenerSeen = currentPortOpener
         }
         var player = ns.getPlayer()
-        if (player.skills.hacking >= 10) {
-            addTarget(ns, "joesguns")
-        }
         var threadsAvail = threadsAvailable(ns, 1.75, false)
-        if (threadsAvail >= 1500) {
-            addTarget(ns, "sigma-cosmetics")
+        var stages = {
+            0: ["joesguns"],
+            1500: ["sigma-cosmetics"],
+            3000: ["harakiri-sushi", "max-hardware", "zer0"],
+            6000: ["phantasy", "iron-gym"],
+            15000: ["omega-net", "silver-helix", "crush-fitness"],
+            25000: ["nectar-net", "hong-fang-tea", "neo-net"],
+            40000: ["computek", "netlink", "catalyst"],
         }
-        if (threadsAvail >= 3000) {
-            addTarget(ns, "harakiri-sushi", "max-hardware", "zer0")
+        for (const stage of Object.keys(stages)) {
+            if (threadsAvail >= stage) {
+                for (const name of stages[stage]) {
+                    var server = ns.getServer(name)
+                    if (server.hasAdminRights && (server.hackDifficulty <= player.skills.hacking)) {
+                        addTarget(ns, name)
+                        await ns.sleep(100)
+                    }
+                }
+            }
+        }
 
-        }
-        if (threadsAvail >= 6000) {
-            addTarget(ns, "phantasy", "iron-gym")
-
-        }
-        if (threadsAvail >= 10000) {
-            addTarget(ns, "omega-net", "silver-helix", "crush-fitness")
-
-        }
-        if (threadsAvail >= 15000) {
-            addTarget(ns, "foodnstuff", "nectar-net", "hong-fang-tea", "neo-net")
-
-        }
         if (threadsAvail >= 1000000) {
             ns.exec("/scripts/add-all-targets.js", "home")
         }

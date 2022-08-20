@@ -5,17 +5,20 @@ import {
     filter_minMaxMoney,
     filter_adminRights,
     sortObjectBy,
-    sortByFunctionValue,
+    //sortByFunctionValue,
     sortByKey,
 } from "lib/utils.js";
 
 /** @param {import("../..").NS } ns */
 export async function main(ns) {
+    // can be used to add specialized sort functions 
+    // if necessary, but most information should be
+    // already injected in the server object by getAdditionalServerInfo()
+    // during the getAllServers() call
     var sortTypes = {
-        "weakenTime": sortByFunctionValue(ns.getWeakenTime),
-        "growTime": sortByFunctionValue(ns.getGrowTime),
-        "hackTime": sortByFunctionValue(ns.getHackTime),
-        "score": sortByScore(),
+        // "weakenTime": sortByFunctionValue(ns.getWeakenTime),
+        // "growTime": sortByFunctionValue(ns.getGrowTime),
+        // "hackTime": sortByFunctionValue(ns.getHackTime),
     }
 
     var sortType = "moneyMax"
@@ -38,37 +41,20 @@ export async function main(ns) {
     servers = applyFilter(servers, [maxMoneyFilter], false)
 
     for (const server of sortObjectBy(servers, sortFunc)) {
-        let name = server.hostname
         if (output != "") {
             ns.tprintf("%s", server[output])
             continue
         }
         ns.tprintf(
-            "%20s: score: %8s; m: %8s; gr: %4d; sm: %3d; wt: %10d; gt: %10d; ht: %10d",
+            "%20s: score: %8s; m: %8s; gr: %4d; sm: %3d; wt: %8s; gt: %8s; ht: %8s",
             server.hostname,
-            ns.nFormat(serverScore(server), '0.00e+0'),
+            ns.nFormat(server.score, '0.00e+0'),
             ns.nFormat(server.moneyMax, "($0.00a)"),
             server.serverGrowth,
             server.minDifficulty,
-            ns.getWeakenTime(name),
-            ns.getGrowTime(name),
-            ns.getHackTime(name),
+            ns.nFormat(server.weakenTime / 1000, "00:00:00"),
+            ns.nFormat(server.growTime / 1000, "00:00:00"),
+            ns.nFormat(server.hackTime / 1000, "00:00:00"),
         )
     }
-}
-
-export function serverScore(server) {
-    return server.moneyMax / (server.minDifficulty / server.serverGrowth)
-}
-
-export function sortByScore() {
-    return (function (x, y) {
-        if (serverScore(x) < serverScore(y)) {
-            return -1
-        }
-        if (serverScore(x) > serverScore(y)) {
-            return 1
-        }
-        return 0
-    })
 }

@@ -2,7 +2,6 @@ import {
     applyFilter,
     filter_adminRights,
     filter_minRamAvailable,
-    getAdditionalServerInfo,
     getAllServers,
     performAttack,
     getGrowAttack,
@@ -20,7 +19,6 @@ export async function main(ns) {
 
     while (true) {
         let target = ns.getServer(targetName)
-        let addonInfo = getAdditionalServerInfo(ns, target)
         let attackers = getAttackers(ns)
 
         if (Object.keys(attackers).length <= 0) {
@@ -29,9 +27,9 @@ export async function main(ns) {
             continue
         }
 
-        if (target.hackDifficulty > addonInfo.securityThreshold) {
+        if (target.hackDifficulty > target.securityThreshold) {
             await ns.sleep(performAttack(ns, weakenAttack, target, attackers))
-        } else if (target.moneyAvailable < addonInfo.moneyThreshold) {
+        } else if (target.moneyAvailable < target.moneyThreshold) {
             await ns.sleep(performAttack(ns, growAttack, target, attackers))
         } else {
             await ns.sleep(performAttack(ns, hackAttack, target, attackers))
