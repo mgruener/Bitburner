@@ -42,7 +42,7 @@ export async function main(ns) {
             }
         }
 
-        if (threadsAvail >= 100000) {
+        if (threadsAvail >= 100000 && (player.skills.hacking > 2200)) {
             ns.exec("/scripts/add-all-targets.js", "home")
             return
         }
