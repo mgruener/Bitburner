@@ -42,7 +42,7 @@ export async function main(ns) {
             }
         }
 
-        if (threadsAvail >= 1000000) {
+        if (threadsAvail >= 100000) {
             ns.exec("/scripts/add-all-targets.js", "home")
             return
         }
