@@ -312,6 +312,9 @@ export function hasFormulas(ns) {
 export function maxRegrowAmount(ns, server, secThreshold, cores = 1) {
 	var threadsAvail = threadsAvailable(ns, 1.7, false)
 	var maxAmount = server.moneyMax - server.moneyAvailable
+	if (maxAmount <= 0) {
+		maxAmount = server.moneyMax
+	}
 	if (!hasFormulas(ns)) {
 		return maxAmount
 	}
@@ -332,8 +335,6 @@ export function getAdditionalServerInfo(ns, server, attacker = server) {
 	fakeServer.hackDifficulty = securityThreshold
 	if (hasFormulas(ns)) {
 		var player = ns.getPlayer()
-		var fakeServer = { ...server }
-		fakeServer.hackDifficulty = securityThreshold
 		weakenTime = ns.formulas.hacking.weakenTime(fakeServer, player)
 		hackTime = ns.formulas.hacking.hackTime(fakeServer, player)
 		growTime = ns.formulas.hacking.growTime(fakeServer, player)
@@ -653,10 +654,11 @@ export function performAttack(ns, attack, target, attackers) {
 	// ...lets see if we can reduce the amount of threads required by re-calculating
 	// this with the most suitable attacker
 	requiredThreads = getAdditionalServerInfo(ns, target, servers[0])[attack["threads"]]
+	var threadCount = requiredThreads
 	for (const server of servers) {
 		let serverThreads = Math.floor((ramAvail(server) / scriptRam))
-		if (serverThreads > requiredThreads) {
-			serverThreads = requiredThreads
+		if (serverThreads > threadCount) {
+			serverThreads = threadCount
 		}
 		let pid = ns.exec(attack["script"], server.hostname, serverThreads, target.hostname, serverThreads)
 		if (pid == 0) {
@@ -664,16 +666,16 @@ export function performAttack(ns, attack, target, attackers) {
 			continue
 		}
 		pids.push(pid)
-		requiredThreads = requiredThreads - serverThreads
+		threadCount = threadCount - serverThreads
 		attackThreads = attackThreads + serverThreads
 		serverCount++
-		if (requiredThreads <= 0) {
+		if (threadCount <= 0) {
 			break
 		}
 	}
 	return {
 		"waitTime": waitTime,
-		"requiredThreads": addonInfo[attack["threads"]],
+		"requiredThreads": requiredThreads,
 		"attackThreads": attackThreads,
 		"operation": attack["type"],
 		"serverCount": serverCount,
