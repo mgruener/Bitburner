@@ -320,7 +320,7 @@ export function maxRegrowAmount(ns, server, secThreshold, cores = 1) {
 	}
 	var srv = { ...server }
 	srv.hackDifficulty = secThreshold
-	return Math.min(maxAmount, (server.moneyAvailable * ns.formulas.hacking.growPercent(srv, threadsAvail, ns.getPlayer(), cores)) - server.moneyAvailable)
+	return Math.min(server.moneyMax, (server.moneyAvailable * ns.formulas.hacking.growPercent(srv, threadsAvail, ns.getPlayer(), cores)) - server.moneyAvailable)
 }
 
 export function getAdditionalServerInfo(ns, server, attacker = server) {
@@ -340,7 +340,7 @@ export function getAdditionalServerInfo(ns, server, attacker = server) {
 		growTime = ns.formulas.hacking.growTime(fakeServer, player)
 	}
 	var score = server.moneyMax / (server.minDifficulty / server.serverGrowth)
-
+	var timeScore = server.moneyMax / ((2 * weakenTime + growTime + hackTime) / 1000)
 	var result = {
 		...server,
 		"moneyThreshold": moneyThreshold,
@@ -353,6 +353,7 @@ export function getAdditionalServerInfo(ns, server, attacker = server) {
 		"hackTime": hackTime,
 		"growTime": growTime,
 		"score": score,
+		"timeScore": timeScore,
 	}
 	return result
 }
@@ -655,6 +656,18 @@ export function performAttack(ns, attack, target, attackers) {
 	// this with the most suitable attacker
 	requiredThreads = getAdditionalServerInfo(ns, target, servers[0])[attack["threads"]]
 	var threadCount = requiredThreads
+	if (threadCount <= 0) {
+		ns.tprintf("Zero thread count for attack: t: %s; a: %s", target.hostname, attack["type"])
+		return {
+			"waitTime": 0,
+			"requiredThreads": requiredThreads,
+			"attackThreads": 0,
+			"operation": attack["type"],
+			"serverCount": 0,
+			"pids": [],
+			"target": target.hostname,
+		}
+	}
 	for (const server of servers) {
 		let serverThreads = Math.floor((ramAvail(server) / scriptRam))
 		if (serverThreads > threadCount) {

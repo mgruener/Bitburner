@@ -12,6 +12,7 @@ import {
     threadsAvailable,
     sortObjectBy,
     sortByKey,
+    getAdditionalServerInfo,
 } from "lib/utils.js";
 
 /** @param {import("../..").NS } ns */
@@ -47,7 +48,7 @@ export async function main(ns) {
             await ns.sleep(5000)
         }
         for (const targetName of schedulables) {
-            let target = ns.getServer(targetName)
+            let target = getAdditionalServerInfo(ns, ns.getServer(targetName))
             let attackers = getAttackers(ns)
 
             // no attackers available, skip this scheduling cycle
@@ -128,6 +129,9 @@ function updateTargets(ns, current) {
         // stay non empty in the current function?"
         // Also do not add targets that are already present
         if ((data != "NULL PORT DATA") && (!newTargets.includes(data))) {
+            if (!ns.serverExists(data)) {
+                ns.printf("Failed to add new target, server does not exist: %s", data)
+            }
             newTargets.push(data)
         }
     }

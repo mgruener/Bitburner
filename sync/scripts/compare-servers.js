@@ -46,9 +46,10 @@ export async function main(ns) {
             continue
         }
         ns.tprintf(
-            "%20s: score: %8s; m: %8s; gr: %4d; sm: %3d; wt: %8s; gt: %8s; ht: %8s",
+            "%20s: sc: %8s; tsc: %8s; m: %8s; gr: %4d; sm: %3d; wt: %8s; gt: %8s; ht: %8s",
             server.hostname,
             ns.nFormat(server.score, '0.00e+0'),
+            ns.nFormat(server.timeScore, "($0.00a)"),
             ns.nFormat(server.moneyMax, "($0.00a)"),
             server.serverGrowth,
             server.minDifficulty,

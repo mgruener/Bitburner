@@ -22,5 +22,6 @@ export async function main(ns) {
     ns.tprintf("  Grow threads: %f", advancedServer.growThreads)
     ns.tprintf("  Hack threads: %f", advancedServer.hackThreads)
     ns.tprintf("  Score: %s", ns.nFormat(advancedServer.score, '0.00e+0'))
+    ns.tprintf("  TimeScore: %s/s", ns.nFormat(advancedServer.timeScore, "($0.00a)"))
 }
 

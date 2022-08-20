@@ -25,9 +25,10 @@ export async function main(ns) {
             1500: ["sigma-cosmetics"],
             3000: ["harakiri-sushi", "max-hardware", "zer0"],
             6000: ["phantasy", "iron-gym"],
-            15000: ["omega-net", "silver-helix", "crush-fitness"],
+            15000: ["omega-net", "silver-helix"],
             25000: ["nectar-net", "hong-fang-tea", "neo-net"],
-            40000: ["computek", "netlink", "catalyst"],
+            40000: ["computek", "netlink", "catalyst", "summit-uni"],
+            70000: ["rho-construction", "the-hub", "alpha-ent", "snap-fitness", "lexo-corp"]
         }
         for (const stage of Object.keys(stages)) {
             if (threadsAvail >= stage) {
@@ -43,6 +44,7 @@ export async function main(ns) {
 
         if (threadsAvail >= 1000000) {
             ns.exec("/scripts/add-all-targets.js", "home")
+            return
         }
         await ns.sleep(2000)
     }
