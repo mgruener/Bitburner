@@ -42,11 +42,6 @@ export async function main(ns) {
     var startDate = new Date()
     while (true) {
         let schedulables = getSchedulables(targets, procs)
-        // check if there is anything to schedule and if not,
-        // wait a fixed amount before checking again
-        if (schedulables.length <= 0) {
-            await ns.sleep(5000)
-        }
         for (const targetName of schedulables) {
             let target = getAdditionalServerInfo(ns, ns.getServer(targetName))
             let attackers = getAttackers(ns)
@@ -66,7 +61,7 @@ export async function main(ns) {
             procs[targetName] = state
         }
         printState(ns, procs, targets)
-        let waitResult = await wait(ns, procs, startDate, 1000)
+        let waitResult = await wait(ns, procs, startDate)
         procs = waitResult["procs"]
         startDate = waitResult["startDate"]
         targets = updateTargets(ns, targets)
@@ -92,15 +87,15 @@ function getSchedulables(targets, procs) {
     return schedulables
 }
 
-async function wait(ns, procs, startDate = new Date(), waitTime = 1000) {
+async function wait(ns, procs, startDate = new Date()) {
     var newProcs = {}
-    ns.printf("Sleeping for %s", ns.tFormat(waitTime))
-    var endDate = new Date()
-    var timeDiff = endDate.getTime() - startDate.getTime()
-    await ns.sleep(Math.max(waitTime - timeDiff, 100))
+    await ns.sleep(200)
     var newStartDate = new Date()
+    var endDate = new Date()
+    var iterationTime = endDate.getTime() - startDate.getTime()
+    ns.printf("Schedule iteration took %s ms", iterationTime)
     for (const proc in procs) {
-        let newWaitTime = procs[proc]["waitTime"] - waitTime
+        let newWaitTime = procs[proc]["waitTime"] - iterationTime
         let pids = procs[proc]["pids"]
         let newPids = [...pids].filter((p) => ns.isRunning(p))
         if (newPids.length < 1) {

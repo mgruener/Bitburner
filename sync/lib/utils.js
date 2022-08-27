@@ -320,7 +320,11 @@ export function maxRegrowAmount(ns, server, secThreshold, cores = 1) {
 	}
 	var srv = { ...server }
 	srv.hackDifficulty = secThreshold
-	return Math.min(server.moneyMax, (server.moneyAvailable * ns.formulas.hacking.growPercent(srv, threadsAvail, ns.getPlayer(), cores)) - server.moneyAvailable)
+	var growPercent = ns.formulas.hacking.growPercent(srv, threadsAvail, ns.getPlayer(), cores)
+	if (growPercent == Infinity) {
+		return server.moneyMax
+	}
+	return Math.min(server.moneyMax, (server.moneyAvailable * growPercent) - server.moneyAvailable)
 }
 
 export function getAdditionalServerInfo(ns, server, attacker = server) {
