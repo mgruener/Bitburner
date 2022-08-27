@@ -1,3 +1,8 @@
+export const BASESIZE = 1.6
+export const HACKSIZE = BASESIZE + 0.1
+export const GROWSIZE = BASESIZE + 0.15
+export const WEAKENSIZE = BASESIZE + 0.15
+
 /** @param {import("../..").NS } ns */
 export function _getAllServers(ns) {
 	// result is a dict of str => Server
@@ -224,7 +229,7 @@ export function threadsAvailable(ns, threadSize, onlyFree = true) {
 }
 
 export function getWeakenThreads(ns, server, attacker = server) {
-	var threadsAvail = ramAvail(attacker) / 1.75
+	var threadsAvail = ramAvail(attacker) / WEAKENSIZE
 	var targetAmount = Math.max(server.hackDifficulty - server.minDifficulty, 0)
 	var threadsRequired = Math.ceil(targetAmount / ns.weakenAnalyze(1))
 	// if the provided attacker has enough compute power to perform the full weaken
@@ -239,7 +244,7 @@ export function getWeakenThreads(ns, server, attacker = server) {
 
 export function getGrowThreads(ns, server, attacker = server) {
 	// 1.75GB is the size of the simplest grow script
-	var threadsAvail = ramAvail(attacker) / 1.75
+	var threadsAvail = ramAvail(attacker) / GROWSIZE
 	var money = server.moneyAvailable
 	// If we made a mistake and fully drained a server, we assume the
 	// we need 1000 threads, which is the same as assuming the server has $1000.
@@ -310,7 +315,7 @@ export function hasFormulas(ns) {
 }
 
 export function maxRegrowAmount(ns, server, secThreshold, cores = 1) {
-	var threadsAvail = threadsAvailable(ns, 1.7, false)
+	var threadsAvail = threadsAvailable(ns, HACKSIZE, false)
 	var maxAmount = server.moneyMax - server.moneyAvailable
 	if (maxAmount <= 0) {
 		maxAmount = server.moneyMax
@@ -644,42 +649,45 @@ export async function schedule(ns, script, shouldThreads = 1, args = []) {
 	return ns.exec(script, target, execThreads, ...args) != 0
 }
 
-export function performAttack(ns, attack, target, attackers) {
+export function prepareAttack(ns, attack, target, attackers) {
 	var requiredThreads = target[attack["threads"]]
-	var waitTime = attack["wait"](target.hostname) + 25
+	var waitTime = attack["wait"](target.hostname)
+
+	var servers = attackers
+	// only weaken() and grow() benefit from multiple cores
+	if (attack["type"] != "hack") {
+		// this sorts the servers according to the amount of threads required by
+		// a single core system (assuming that all attackable systems are single core)...
+		servers = sortObjectBy(attackers, sortByComputePower(requiredThreads))
+		// ...lets see if we can reduce the amount of threads required by re-calculating
+		// this with the most suitable attacker
+		requiredThreads = getAdditionalServerInfo(ns, target, servers[0])[attack["threads"]]
+	}
+
+	return {
+		...attack,
+		"requiredThreads": requiredThreads,
+		"waitTime": waitTime,
+		"servers": servers,
+		"target": target,
+	}
+}
+
+export function performAttack(ns, attack) {
 	var attackThreads = 0
 	var serverCount = 0
-	var scriptRam = ns.getScriptRam(attack["script"])
 
 	ns.disableLog("exec")
 	var pids = []
-	// this sorts the servers according to the amount of threads required by
-	// a single core system (assuming that all attackable systems are single core)...
-	var servers = sortObjectBy(attackers, sortByComputePower(requiredThreads))
-	// ...lets see if we can reduce the amount of threads required by re-calculating
-	// this with the most suitable attacker
-	requiredThreads = getAdditionalServerInfo(ns, target, servers[0])[attack["threads"]]
-	var threadCount = requiredThreads
-	if (threadCount <= 0) {
-		ns.tprintf("Zero thread count for attack: t: %s; a: %s", target.hostname, attack["type"])
-		return {
-			"waitTime": 0,
-			"requiredThreads": requiredThreads,
-			"attackThreads": 0,
-			"operation": attack["type"],
-			"serverCount": 0,
-			"pids": [],
-			"target": target.hostname,
-		}
-	}
-	for (const server of servers) {
-		let serverThreads = Math.floor((ramAvail(server) / scriptRam))
+	var threadCount = attack["requiredThreads"]
+	for (const server of attack["servers"]) {
+		let serverThreads = Math.floor((ramAvail(server) / attack["size"]))
 		if (serverThreads > threadCount) {
 			serverThreads = threadCount
 		}
-		let pid = ns.exec(attack["script"], server.hostname, serverThreads, target.hostname, serverThreads)
+		let pid = ns.exec(attack["script"], server.hostname, serverThreads, attack["target"].hostname, serverThreads)
 		if (pid == 0) {
-			ns.tprintf("Error while performing '%s' on %s from %s", attack["type"], target.hostname, server.hostname)
+			ns.tprintf("Error while performing '%s' on %s from %s", attack["type"], attack["target"].hostname, server.hostname)
 			continue
 		}
 		pids.push(pid)
@@ -691,13 +699,10 @@ export function performAttack(ns, attack, target, attackers) {
 		}
 	}
 	return {
-		"waitTime": waitTime,
-		"requiredThreads": requiredThreads,
+		...attack,
 		"attackThreads": attackThreads,
-		"operation": attack["type"],
 		"serverCount": serverCount,
 		"pids": pids,
-		"target": target.hostname,
 	}
 }
 
@@ -707,6 +712,7 @@ export function getGrowAttack(ns) {
 		"wait": ns.getGrowTime,
 		"threads": "growThreads",
 		"script": "/payload/grow-only.js",
+		"size": GROWSIZE,
 	}
 }
 
@@ -716,6 +722,7 @@ export function getWeakenAttack(ns) {
 		"wait": ns.getWeakenTime,
 		"threads": "weakenThreads",
 		"script": "/payload/weaken-only.js",
+		"size": WEAKENSIZE,
 	}
 }
 
@@ -725,6 +732,7 @@ export function getHackAttack(ns) {
 		"wait": ns.getHackTime,
 		"threads": "hackThreads",
 		"script": "/payload/hack-only.js",
+		"size": HACKSIZE,
 	}
 }
 

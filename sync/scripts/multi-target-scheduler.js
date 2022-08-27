@@ -3,6 +3,7 @@ import {
     filter_adminRights,
     filter_minRamAvailable,
     getAllServers,
+    prepareAttack,
     performAttack,
     getGrowAttack,
     getWeakenAttack,
@@ -18,9 +19,6 @@ import {
 /** @param {import("../..").NS } ns */
 export async function main(ns) {
     var targets = [...ns.args]
-    const growAttack = getGrowAttack(ns)
-    const weakenAttack = getWeakenAttack(ns)
-    const hackAttack = getHackAttack(ns)
     ns.disableLog("disableLog")
     ns.disableLog("sleep")
 
@@ -51,14 +49,19 @@ export async function main(ns) {
                 continue
             }
 
-            var nextAttack = hackAttack
+            var nextAttack = getHackAttack(ns)
             if (target.hackDifficulty > target.securityThreshold) {
-                nextAttack = weakenAttack
+                nextAttack = getWeakenAttack(ns)
             } else if (target.moneyAvailable < target.moneyThreshold) {
-                nextAttack = growAttack
+                nextAttack = getGrowAttack(ns)
             }
-            var state = performAttack(ns, nextAttack, target, attackers)
-            procs[targetName] = state
+            nextAttack = prepareAttack(ns, nextAttack, target, attackers)
+            if (nextAttack["requiredThreads"] <= 0) {
+                ns.tprintf("Zero thread count for attack: t: %s; a: %s", nextAttack["target"].hostname, nextAttack["type"])
+                continue
+            }
+            var proc = performAttack(ns, nextAttack)
+            procs[targetName] = proc
         }
         printState(ns, procs, targets)
         let waitResult = await wait(ns, procs, startDate)
@@ -148,8 +151,8 @@ function printState(ns, procs, targets) {
         ns.print("Running attacks:")
         for (const proc of sortedProcs) {
             ns.printf("  %20s: %6s (s: %3d / %3d; t: %6d; rt: %6d; wt: %8s)",
-                proc["target"],
-                proc["operation"],
+                proc["target"].hostname,
+                proc["type"],
                 proc["pids"].length,
                 proc["serverCount"],
                 proc["attackThreads"],
