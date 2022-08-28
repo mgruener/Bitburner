@@ -228,9 +228,7 @@ export function threadsAvailable(ns, threadSize, onlyFree = true) {
 	return threads
 }
 
-export function getWeakenThreads(ns, server, attacker = server) {
-	var threadsAvail = ramAvail(attacker) / WEAKENSIZE
-	var targetAmount = Math.max(server.hackDifficulty - server.minDifficulty, 0)
+export function getWeakenThreads(ns, server, attacker = server, targetAmount = Math.max(server.hackDifficulty - server.minDifficulty, 0), threadsAvail = ramAvail(attacker) / WEAKENSIZE) {
 	var threadsRequired = Math.ceil(targetAmount / ns.weakenAnalyze(1))
 	// if the provided attacker has enough compute power to perform the full weaken
 	// with one core in one go although it has more than one core, re-calculate the
@@ -242,9 +240,7 @@ export function getWeakenThreads(ns, server, attacker = server) {
 	return threadsRequired
 }
 
-export function getGrowThreads(ns, server, attacker = server) {
-	// 1.75GB is the size of the simplest grow script
-	var threadsAvail = ramAvail(attacker) / GROWSIZE
+export function getGrowThreads(ns, server, attacker = server, amount = server.moneyMax - server.moneyAvailable, threadsAvail = ramAvail(attacker) / GROWSIZE) {
 	var money = server.moneyAvailable
 	// If we made a mistake and fully drained a server, we assume the
 	// we need 1000 threads, which is the same as assuming the server has $1000.
@@ -262,7 +258,7 @@ export function getGrowThreads(ns, server, attacker = server) {
 	if (money <= 0) {
 		return 1000
 	}
-	var growFactor = server.moneyMax / money
+	var growFactor = (amount + money) / money
 	var threadsRequired = Math.ceil(ns.growthAnalyze(server.hostname, growFactor))
 	// if the provided attacker has enough compute power to perform the full grow
 	// with one core in one go although it has more than one core, re-calculate the
@@ -285,7 +281,7 @@ export function getHackThreads(ns, server, maxAmount = Infinity) {
 	// The amount of money created by grow() is based on the
 	// moneyAvailable on the server. If moneyAvailable == 0,
 	// grow() assumes the server has $1 for each thread it is called
-	// with, making it impossible (for my; mayby just complicated for someone else)
+	// with, making it impossible (for me; maybe just complicated for someone else)
 	// to determine the amount of threads required to grow a server to a given amount.
 	// Always reserve 1% of money on the server.
 	var money = Math.min(maxAmount, server.moneyAvailable - (server.moneyAvailable * 0.01))

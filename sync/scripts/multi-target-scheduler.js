@@ -193,3 +193,31 @@ function isRunning(ns) {
     }
     return false
 }
+
+// hack 0.002 -> 25 hack threads / 1 weaken thread
+// grow 0.004 -> 25 grow threads / 2 weaken threads
+// weaken 0.05
+/** @param {import("../..").NS } ns */
+function prepareBatch(ns, target) {
+    // weaken() can easily be parallelized because its only effect
+    // is the security level reduction so we just need to
+    // somehow creates a  batch that defines the required number
+    // of weaken() calls to get to the desired difficulty
+    if (target.hackDifficulty != minDifficulty) {
+        // lower to minDifficulty -> weaken()
+        return
+    }
+    // because results for grow() and hack() are calculated
+    // at the end of their execution time, each batch must be
+    // calculated by attacking server and it must be ensured
+    // that all batches finish in a deterministic order so that
+    // each batch has "cleaned up" after itself before the next
+    // batch finishes
+    if (target.moneyAvailable != target.moneyMax) {
+        // grow to max money -> grow() + weaken()
+        return
+    }
+    // server is at minDifficulty and maxMoney
+    // start hacking it -> hack() + weaken() + grow() + weaken()
+    return
+}
