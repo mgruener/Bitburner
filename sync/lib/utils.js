@@ -310,6 +310,9 @@ export function hasFormulas(ns) {
 }
 
 export function maxRegrowAmount(ns, server, secThreshold, cores = 1) {
+	if (server.purchasedByPlayer) {
+		return 0
+	}
 	var threadsAvail = threadsAvailable(ns, 1.7, false)
 	var maxAmount = server.moneyMax - server.moneyAvailable
 	if (maxAmount <= 0) {
@@ -328,6 +331,23 @@ export function maxRegrowAmount(ns, server, secThreshold, cores = 1) {
 }
 
 export function getAdditionalServerInfo(ns, server, attacker = server) {
+	var result = {
+		...server,
+		"moneyThreshold": 0,
+		"securityThreshold": 0,
+		"weakenThreads": 0,
+		"growThreads": 0,
+		"hackThreads": 0,
+		"maxRegrowAmount": 0,
+		"weakenTime": 0,
+		"hackTime": 0,
+		"growTime": 0,
+		"score": 0,
+		"timeScore": 0,
+	}
+	if (server.purchasedByPlayer) {
+		return result
+	}
 	var name = server.hostname
 	var moneyThreshold = server.moneyMax * 0.75
 	var securityThreshold = server.minDifficulty + 5
@@ -345,7 +365,7 @@ export function getAdditionalServerInfo(ns, server, attacker = server) {
 	}
 	var score = server.moneyMax / (server.minDifficulty / server.serverGrowth)
 	var timeScore = server.moneyMax / ((2 * weakenTime + growTime + hackTime) / 1000)
-	var result = {
+	result = {
 		...server,
 		"moneyThreshold": moneyThreshold,
 		"securityThreshold": securityThreshold,
@@ -519,97 +539,6 @@ export function canAfford(ns, cost) {
 	return ((myMoney(ns) - cost) >= getMoneyLimit(ns))
 }
 
-export function buyHacknetNodes(ns, nodeLimit) {
-	if (ns.hacknet.numNodes() >= nodeLimit) {
-		return true
-	}
-	while (canAfford(ns, ns.hacknet.getPurchaseNodeCost())) {
-		ns.hacknet.purchaseNode()
-		if (ns.hacknet.numNodes() >= nodeLimit) {
-			return true
-		}
-	}
-	return false
-}
-
-export async function upgradeHacknetNodes(ns, upgrade) {
-	var nodeLimit = upgrade["nodeLimit"]
-	var resType = upgrade["type"]
-	var resLimit = upgrade["limit"]
-	var doUpgrade = upgrade["upgradeFunc"]
-	var getCosts = upgrade["costFunc"]
-	var curNodes = ns.hacknet.numNodes()
-	if (curNodes < nodeLimit) {
-		return false
-	}
-
-	var nodes = {}
-	while (!(resLimit in nodes) || (nodes[resLimit].length < nodeLimit)) {
-		nodes = {}
-		for (var i = 0; i < curNodes; i++) {
-			let res = ns.hacknet.getNodeStats(i)[resType]
-			if (res in nodes) {
-				nodes[res].push(i)
-				continue
-			}
-			nodes[res] = [i]
-		}
-
-		let resValues = [...Object.keys(nodes)].sort((a, b) => a - b)
-		let maxResValue = resValues[resValues.length - 1]
-		let targetResValue = Math.min(maxResValue + 1, resLimit)
-		if (nodes[maxResValue].length < nodeLimit) {
-			targetResValue = maxResValue
-			resValues.pop()
-		} else if (maxResValue == resLimit) {
-			return true
-		}
-		for (const val of resValues) {
-			for (const i of nodes[val]) {
-				while (ns.hacknet.getNodeStats(i)[resType] != targetResValue) {
-					var upgradeCost = getCosts(i, 1);
-					if (!canAfford(ns, upgradeCost)) {
-						// not enough money to further upgrade, stop here
-						return false
-					}
-					doUpgrade(i, 1);
-				}
-				await ns.sleep(50)
-			}
-		}
-	}
-	return true
-}
-
-export function getHacknetRamUpgrade(ns, nodeLimit = 8) {
-	return {
-		"nodeLimit": nodeLimit,
-		"limit": 64,
-		"type": "ram",
-		"costFunc": ns.hacknet.getRamUpgradeCost,
-		"upgradeFunc": ns.hacknet.upgradeRam,
-	}
-}
-
-export function getHacknetLevelUpgrade(ns, nodeLimit = 8) {
-	return {
-		"nodeLimit": nodeLimit,
-		"limit": 200,
-		"type": "level",
-		"costFunc": ns.hacknet.getLevelUpgradeCost,
-		"upgradeFunc": ns.hacknet.upgradeLevel,
-	}
-}
-
-export function getHacknetCoreUpgrade(ns, nodeLimit = 8) {
-	return {
-		"nodeLimit": nodeLimit,
-		"limit": 16,
-		"type": "cores",
-		"costFunc": ns.hacknet.getCoreUpgradeCost,
-		"upgradeFunc": ns.hacknet.upgradeCore,
-	}
-}
 
 // set shouldThreads to -1 to automatically determine the number of threads
 export async function schedule(ns, script, shouldThreads = 1, args = []) {
