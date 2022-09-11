@@ -2,7 +2,17 @@ import {
     canAfford,
     deployPayload
 } from "lib/utils.js";
-
+// Upgrades:
+//   Sell for Money
+//   Sell for Corporation Funds
+//   Reduce Minimum Security
+//   Increase Maximum Money
+//   Improve Studying
+//   Improve Gym Training
+//   Exchange for Corporation Research
+//   Exchange for Bladeburner Rank
+//   Exchange for Bladeburner SP
+//   Generate Coding Contract
 export class HacknetServerManager {
     #ns
     #nodeLimit
