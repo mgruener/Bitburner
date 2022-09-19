@@ -9,11 +9,11 @@ export async function main(ns) {
 
     var manager = new HacknetServerManager(ns)
     while (!manager.allCompleted) {
-        let nextUpgrade = manager.cheapestUpgrade()
+        let nextUpgrade = manager.recommendUpgrade()
         while (manager.canAffordUpgrade(nextUpgrade["upgrade"], nextUpgrade["server"]) && !manager.allCompleted) {
             ns.printf("Buying '%s' upgrade for server '%s'", nextUpgrade["upgrade"], nextUpgrade["server"])
-            manager.buyUpgrade(nextUpgrade["upgrade"], nextUpgrade["server"])
-            nextUpgrade = manager.cheapestUpgrade()
+            await manager.buyUpgrade(nextUpgrade["upgrade"], nextUpgrade["server"])
+            nextUpgrade = manager.recommendUpgrade()
             await ns.sleep(100)
         }
         await ns.sleep(1000)

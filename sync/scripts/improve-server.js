@@ -11,7 +11,7 @@ export async function main(ns) {
     ns.tail(script)
     ns.disableLog("sleep")
 
-    while (server.minDifficulty > 1) {
+    while (server.minDifficulty >= 10) {
         let preSec = server.minDifficulty
         ns.printf("Lowering minimum security for '%s'", name)
 
@@ -27,7 +27,7 @@ export async function main(ns) {
     }
     while (server.moneyMax < 10000000000000) {
         let preMoney = server.moneyMax
-        ns.printf("Lowering minimum security for '%s'", name)
+        ns.printf("Increasing maximum money for '%s'", name)
 
         await buyHashUpgrade(ns, "Increase Maximum Money", name)
         server = ns.getServer(name)

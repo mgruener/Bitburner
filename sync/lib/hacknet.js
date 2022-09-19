@@ -51,12 +51,21 @@ export class HacknetServerManager {
         return production
     }
 
-    buyUpgrade(upgrade, server) {
+    get cacheCapacityBottleneck() {
+        for (const upgrade of this.api.getHashUpgrades()) {
+            if (this.api.hashCost(upgrade, 1) > this.api.hashCapacity()) {
+                return true
+            }
+        }
+        return false
+    }
+
+    async buyUpgrade(upgrade, server) {
         if (!this.canAffordUpgrade(upgrade, server)) {
             return this.isComplete(upgrade)
         }
         if (upgrade == "servers") {
-            return this.buyServer()
+            return await this.buyServer()
         }
         var doUpgrade = this.#upgrades[upgrade]["upgradeFunc"]
         var upgradeMax = this.#upgrades[upgrade]["limit"]
@@ -67,9 +76,10 @@ export class HacknetServerManager {
         return this.isComplete(upgrade)
     }
 
-    buyServer() {
+    async buyServer() {
         if (this.canAffordUpgrade("servers", -1)) {
-            this.api.purchaseNode()
+            let id = this.api.purchaseNode()
+            await deployPayload(this.#ns, "hacknet-node-" + id)
             if (this.api.numNodes() >= this.#nodeLimit) {
                 return this.#markComplete("servers")
             }
@@ -77,18 +87,24 @@ export class HacknetServerManager {
         return this.isComplete("servers")
     }
 
-    cheapestUpgrade() {
+    recommendUpgrade() {
         var cost = this.api.getPurchaseNodeCost()
         var upgrade = "servers"
         var server = -1
-        // if we have no hacknet servers, the cheapest 
-        // upgrade is always to buy a server
-        if (this.api.numNodes() < 1) {
+        // If we have no hacknet servers, the cheapest 
+        // upgrade is always to buy a server.
+        // Also if we can afford buying a new server, do so.
+        if ((this.api.numNodes() < 1) || this.canAffordUpgrade(upgrade, server)) {
             return { "upgrade": upgrade, "server": server }
         }
 
         for (let index = 0; index < this.api.numNodes(); index++) {
             for (const upgradeCandidate of ["level", "cache", "cores", "ram"]) {
+                // only upgrade the cache if there is an upgrade
+                // that costs more than our current hash capacity
+                if ((upgradeCandidate == "cache") && !this.cacheCapacityBottleneck) {
+                    continue
+                }
                 let costCandidate = this.#upgrades[upgradeCandidate]["costFunc"](index, 1)
                 if (costCandidate < cost) {
                     cost = costCandidate
