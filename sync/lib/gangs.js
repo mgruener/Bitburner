@@ -16,6 +16,19 @@ export class GangMember {
         this.#gang = gang
     }
 
+    ascend() {
+        var ignoreStats = ["respect"]
+        if (this.#gang.api.getGangInformation().isHacking) {
+            ignoreStats = ["respect", "agi", "def", "dex", "str"]
+        }
+        var ascensionBlocker = this.ascensionBlocker(ignoreStats)
+        if (ascensionBlocker != "") {
+            this.#gang.ns.printf("Not ascending %s because of %s", this.#name, ascensionBlocker)
+            return
+        }
+        this.#gang.api.ascendMember(this.#name)
+    }
+
     stopAssignment() {
         this.#doTask("Unassigned")
     }
@@ -53,7 +66,35 @@ export class GangMember {
     }
 
     terrorism() {
-        this.#doTask("Human Trafficking")
+        this.#doTask("Terrorism")
+    }
+
+    ransomware() {
+        this.#doTask("Ransomware")
+    }
+    phishing() {
+        this.#doTask("Phishing")
+    }
+    identityTheft() {
+        this.#doTask("Identity Theft")
+    }
+    ddosAttacks() {
+        this.#doTask("DDoS Attacks")
+    }
+    plantVirus() {
+        this.#doTask("Plant Virus")
+    }
+    frautAndCounterfeiting() {
+        this.#doTask("Fraud & Counterfeiting")
+    }
+    moneyLaundering() {
+        this.#doTask("Money Laundering")
+    }
+    cyberterrorism() {
+        this.#doTask("Cyberterrorism")
+    }
+    ethicalHacking() {
+        this.#doTask("Ethical Hacking")
     }
 
     vigilanteJuistice() {
@@ -83,12 +124,27 @@ export class GangMember {
         this.#gang.api.purchaseEquipment(this.#name, equipment)
     }
 
+    ascensionBlocker(ignore = ["respect"]) {
+        var mults = this.#gang.api.getAscensionResult(this.#name)
+        if (mults) {
+            for (const stat of Object.keys(mults)) {
+                if (ignore.includes(stat)) {
+                    continue
+                }
+                if (mults[stat] <= 1) {
+                    return stat
+                }
+            }
+        }
+        return ""
+    }
+
     get name() {
         return this.#name
     }
 
     get info() {
-        this.#gang.api.getMemberInformation(this.#name)
+        return this.#gang.api.getMemberInformation(this.#name)
     }
 
     #doTask(task = isRequired("task")) {
@@ -114,12 +170,31 @@ export class Gang {
     }
 
     async manage() {
-        let gangInfo = this.#api.getGangInformation()
         this.recruitMembers()
-        if (gangInfo.wantedPenalty < WANTED_PENALTY_LIMIT) {
+        this.buyEquipment()
+        this.task("trainCharisma")
+        await this.ns.sleep(120000)
+        this.task("trainHacking")
+        await this.ns.sleep(120000)
+        if (this.#api.getGangInformation().isHacking) {
+            this.task("moneyLaundering")
+            await this.ns.sleep(900000)
+            this.task("cyberterrorism")
+            await this.ns.sleep(900000)
+        } else {
+            this.task("trainCombat")
+            await this.ns.sleep(120000)
+            this.task("humanTrafficking")
+            await this.ns.sleep(900000)
+            this.task("terrorism")
+            await this.ns.sleep(900000)
+        }
+        this.buyEquipment("Augmentation")
+        this.recruitMembers()
+        if (this.#api.getGangInformation().wantedPenalty < WANTED_PENALTY_LIMIT) {
             await this.reduceWantedLevel()
         }
-        this.buyEquipment()
+        this.task("ascend")
     }
 
     recruitMembers() {
@@ -130,11 +205,13 @@ export class Gang {
         }
     }
 
-    buyEquipment() {
+    buyEquipment(equipType = "all") {
         this.#ns.print("Buying equipment for gang")
         var equipmentCost = {}
         for (const name of this.#api.getEquipmentNames()) {
-            equipmentCost[name] = this.#api.getEquipmentCost(name)
+            if ((equipType == "all") || (this.#api.getEquipmentType(name) == equipType)) {
+                equipmentCost[name] = this.#api.getEquipmentCost(name)
+            }
         }
 
         let sortedEquipment = Object.keys(equipmentCost).sort((a, b) => equipmentCost[a] - equipmentCost[b])
@@ -150,10 +227,12 @@ export class Gang {
     }
 
     async reduceWantedLevel() {
-        for (const member of Object.values(this.#members)) {
-            member.vigilanteJuistice()
+        var task = "vigilanteJuistice"
+        if (this.#api.getGangInformation().isHacking) {
+            task = "ethicalHacking"
         }
-        while (this.#api.getGangInformation().wantedPenalty < 1) {
+        while ((this.#api.getGangInformation().wantedPenalty < 1) && (this.#api.getGangInformation().wantedLevel > 1)) {
+            this.task(task)
             await this.#ns.sleep(1000)
         }
     }
@@ -170,6 +249,12 @@ export class Gang {
             }
         }
         return ""
+    }
+
+    task(task = isRequired("task")) {
+        for (const member of Object.values(this.#members)) {
+            member[task]()
+        }
     }
 
     get ns() {

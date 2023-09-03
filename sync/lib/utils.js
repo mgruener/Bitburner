@@ -150,6 +150,38 @@ export function filter_minMaxMoney(amount = 1) {
 	})
 }
 
+export function filter_hasBackdoor(state = true) {
+	return (function (host) {
+		return (host.backdoorInstalled == state)
+	})
+}
+
+export function filter_and(filters) {
+	return (function (host) {
+		filters.forEach(function (f) {
+			if (!f(host)) {
+				return false
+			}
+		})
+	})
+}
+
+export function filter_or(filters) {
+	return (function (host) {
+		filters.forEach(function (f) {
+			if (f(host)) {
+				return true
+			}
+		})
+	})
+}
+
+export function filter_not(filter) {
+	return (function (host) {
+		return !filter(host)
+	})
+}
+
 export function portOpener(ns) {
 	var portOpener = []
 	if (ns.fileExists("BruteSSH.exe", "home")) {
@@ -301,6 +333,7 @@ export async function deployPayload(ns, name) {
 		"/payload/grow-only.js",
 		"/payload/weaken-only.js",
 		"/payload/share.js",
+		"/payload/backdoor.js",
 	]
 	await ns.scp(files, name, "home")
 }

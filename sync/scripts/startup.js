@@ -24,7 +24,7 @@ export async function main(ns) {
         var threadsAvail = threadsAvailable(ns, 1.75, false)
         if (sleeveCount >= 1) {
             for (var id = 0; id < sleeveCount; id++) {
-                var sleeve = ns.sleeve.getSleeveStats(id)
+                var sleeve = ns.sleeve.getSleeve(id)
                 var task = ns.sleeve.getTask(id)
                 if ((sleeve.shock > 0) && (task.type != "RECOVERY")) {
                     ns.sleeve.setToShockRecovery(id)
@@ -34,12 +34,12 @@ export async function main(ns) {
                     ns.sleeve.setToSynchronize(id)
                 }
             }
-            if ((player.skills.hacking < 10) && (ns.sleeve.getSleeveStats(0).sync >= 100)) {
+            if ((player.skills.hacking < 10) && (ns.sleeve.getSleeve(0).sync >= 100)) {
                 if (!ns.sleeve.setToUniversityCourse(0, "Rothman University", "Study Computer Science")) {
                     ns.print("Failed to send sleeve 0 to study computer science at Rothman University")
                 }
             }
-            if ((player.skills.hacking >= 10) && (player.factions.includes("Tian Di Hui")) && (ns.sleeve.getSleeveStats(0).sync >= 100)) {
+            if ((player.skills.hacking >= 10) && (player.factions.includes("Tian Di Hui")) && (ns.sleeve.getSleeve(0).sync >= 100)) {
                 if (!ns.sleeve.setToFactionWork(0, "Tian Di Hui", "Hacking Contracts")) {
                     ns.print("Failed to send sleeve 0 to do hacking contracts for Tian Di Hui")
                 }

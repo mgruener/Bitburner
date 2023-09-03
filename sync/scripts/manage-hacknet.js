@@ -14,7 +14,6 @@ export async function main(ns) {
             ns.printf("Buying '%s' upgrade for server '%s'", nextUpgrade["upgrade"], nextUpgrade["server"])
             await manager.buyUpgrade(nextUpgrade["upgrade"], nextUpgrade["server"])
             nextUpgrade = manager.recommendUpgrade()
-            await ns.sleep(100)
         }
         await ns.sleep(1000)
     }

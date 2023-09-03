@@ -4,7 +4,10 @@ import {
 
 /** @param {import("../..").NS } ns */
 export async function main(ns) {
-    var name = ns.args[0]
-    var gang = new Gang(ns, name)
-    await gang.manage()
+    ns.disableLog("disableLog")
+    var gang = new Gang(ns)
+
+    while (true) {
+        await gang.manage()
+    }
 }

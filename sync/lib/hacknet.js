@@ -79,7 +79,7 @@ export class HacknetServerManager {
     async buyServer() {
         if (this.canAffordUpgrade("servers", -1)) {
             let id = this.api.purchaseNode()
-            await deployPayload(this.#ns, "hacknet-node-" + id)
+            await deployPayload(this.#ns, "hacknet-server-" + id)
             if (this.api.numNodes() >= this.#nodeLimit) {
                 return this.#markComplete("servers")
             }
