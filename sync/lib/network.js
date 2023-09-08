@@ -24,19 +24,22 @@ export class Network {
         return this.#knownHosts
     }
 
-    /** @param {Array} names */
-    findServer(names) {
-        var queries = ["CSEC", "avmnite-02h", "I.I.I.I", "run4theh111z", "fulcrumassets", "w0r1d_d43m0n"]
-        if (names && names.length > 0) {
-            queries = names
-        }
+    /** @param {string} hostname */
+    goToServer(hostname) {
+        const path = this.findServer([hostname])
+        path[0].forEach(element => {
+            this.ns.singularity.connect(element)
+        });
+    }
 
+    /** @param {Array} hostnames */
+    findServer(hostnames) {
         const result = []
-        for (const name of queries) {
+        for (const hostname of hostnames) {
             const queryResult = []
             const handlers = new WalkHandlers()
             handlers.postFn = function (network, node, children) {
-                if (node == name) {
+                if (node == hostname) {
                     queryResult.push(node)
                     return
                 }
