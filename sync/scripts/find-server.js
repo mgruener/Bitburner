@@ -9,7 +9,7 @@ export async function main(ns) {
         hostnames = ns.args
     }
 
-    var network = new Network(ns)
+    const network = new Network(ns)
     network.findServer(hostnames).forEach(element => {
         ns.tprintf("%s", element)
     });

@@ -8,7 +8,7 @@ export async function main(ns) {
     if (ns.args.length > 0) {
         target = ns.args[0]
     }
-    var network = new Network(ns)
+    const network = new Network(ns)
     network.goToServer(target)
 }
 
