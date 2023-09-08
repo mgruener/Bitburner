@@ -46,27 +46,6 @@ export function getAllServers(ns) {
 	return result
 }
 
-/** @param {import("../..").NS } ns */
-export function findServer(ns, name, node = "home", servers = getAllServers(ns), path = [node]) {
-	// found it!
-	if (servers[node].hostname == name) {
-		return path
-	}
-	// we have been here before
-	if (path.indexOf(node) != (path.length - 1)) {
-		return []
-	}
-	// search all connected nodes
-	// note: "children" is an additional server attribute that is added to each
-	// server object by the getAllServers() function
-	for (const next of servers[node].children) {
-		let result = findServer(ns, name, next, servers, [...path, next])
-		if (result.length > 0) {
-			return result
-		}
-	}
-	return []
-}
 
 export function applyFilter(hosts, filter = [], exclude = true, matchAny = true) {
 	var results = []
