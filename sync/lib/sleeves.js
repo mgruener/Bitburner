@@ -1,11 +1,16 @@
 export class SleeveArmy {
     #ns
     #numSleeves
+    #claims
 
     /** @param {import("../..").NS } ns */
     constructor(ns) {
         this.#ns = ns
         this.#numSleeves = ns.sleeve.getNumSleeves()
+        if (!self.sleeveClaims) {
+            self.sleeveClaims = new SleeveClaims(ns)
+        }
+        this.#claims = self.sleeveClaims
     }
 
     get ns() {
@@ -78,5 +83,249 @@ export class SleeveArmy {
         for (var id = 0; id < this.#numSleeves; id++) {
             fn(this, id)
         }
+    }
+
+    availableSleeve() {
+        if (this.#claims.unclaimed.length > 0) {
+            const unclaimed = this.#claims.unclaimed
+            //this.#ns.tprintf("unclaimed: %s", unclaimed)
+            return unclaimed[0]
+        }
+        return "-1"
+    }
+
+    setToCommitCrime(crimeType, owner) {
+        const task = {
+            "type": "CRIME",
+            "crimeType": crimeType
+        }
+        const id = this.availableSleeve()
+        const claim = this.#claims.claim(id, task, owner)
+        if (claim != null) {
+            if (!this.api.setToCommitCrime(id, crimeType)) {
+                this.#claims.release(claim)
+                return null
+            }
+        }
+        return claim
+    }
+
+    setToCompanyWork(companyName, owner) {
+        const task = {
+            "type": "COMPANY",
+            "companyName": companyName
+        }
+        const id = this.availableSleeve()
+        const claim = this.#claims.claim(id, task, owner)
+        if (claim != null) {
+            if (!this.api.setToCompanyWork(id, companyName)) {
+                this.#claims.release(claim)
+                return null
+            }
+        }
+        return claim
+    }
+
+    setToFactionWork(factionName, factionWorkType, owner) {
+        const task = {
+            "type": "FACTION",
+            "factionWorkType": factionWorkType,
+            "factionName": factionName
+        }
+        const id = this.availableSleeve()
+        const claim = this.#claims.claim(id, task, owner)
+        if (claim != null) {
+            if (!this.api.setToFactionWork(id, factionName, factionWorkType)) {
+                this.#claims.release(claim)
+                return null
+            }
+        }
+        return claim
+    }
+
+    setToGymWorkout(gymName, stat, owner) {
+        const task = {
+            "type": "CLASS",
+            "classType": stat,
+            "location": gymName
+        }
+        const id = this.availableSleeve()
+        const claim = this.#claims.claim(id, task, owner)
+        if (claim != null) {
+            if (!this.api.setToGymWorkout(id, gymName, stat)) {
+                this.#claims.release(claim)
+                return null
+            }
+        }
+        return claim
+    }
+
+    setToIdle(owner) {
+        const task = null
+        const id = this.availableSleeve()
+        const claim = this.#claims.claim(id, task, owner)
+        if (claim != null) {
+            this.api.setToIdle(id)
+        }
+        return claim
+    }
+
+    setToShockRecovery(owner) {
+        const task = {
+            "type": "RECOVERY"
+        }
+        const id = this.availableSleeve()
+        const claim = this.#claims.claim(id, task, owner)
+        if (claim != null) {
+            if (!this.api.setToShockRecovery(id)) {
+                this.#claims.release(claim)
+                return null
+            }
+        }
+        return claim
+    }
+
+    setToSynchronize(owner) {
+        const task = {
+            "type": "SYNCHRO"
+        }
+        const id = this.availableSleeve()
+        const claim = this.#claims.claim(id, task, owner)
+        if (claim != null) {
+            if (!this.api.setToSynchronize(id)) {
+                this.#claims.release(claim)
+                return null
+            }
+        }
+        return claim
+    }
+
+    setToUniversityCourse(university, className, owner) {
+        const task = {
+            "type": "CLASS",
+            "classType": className,
+            "location": university
+        }
+        const id = this.availableSleeve()
+        const claim = this.#claims.claim(id, task, owner)
+        if (claim != null) {
+            if (!this.api.setToUniversityCourse(id, university, className)) {
+                this.#claims.release(claim)
+                return null
+            }
+        }
+        return claim
+    }
+}
+
+export class SleeveClaim {
+    #id
+    #task
+    #owner
+    constructor(id, task, owner) {
+        this.#id = id
+        this.#task = task
+        this.#owner = owner
+    }
+
+    get id() {
+        return this.#id
+    }
+    get task() {
+        return this.#task
+    }
+    get owner() {
+        return this.#owner
+    }
+
+    release() {
+        if (self.sleeveClaims) {
+            self.sleeveClaims.release(this)
+        }
+    }
+}
+
+export class SleeveClaims {
+    #claims
+    #ns
+    constructor(ns) {
+        this.#claims = {}
+        this.#ns = ns
+    }
+
+    static get validIDs() { return ["0", "1", "2", "3", "4", "5", "6", "7"] }
+
+    // returns a list of unclaimed sleeve ids
+    get unclaimed() {
+        let claimed = Object.keys(this.#claims)
+        if (!claimed) {
+            claimed = []
+        }
+        return SleeveClaims.validIDs.filter((id) => !claimed.includes(id))
+    }
+
+    claim(id, task, owner) {
+        if (!SleeveClaims.validIDs.includes(id)) {
+            return null
+        }
+        if (!(id in this.#claims)) {
+            const claim = new SleeveClaim(id, task, owner)
+            this.#claims[id] = claim
+            return claim
+        }
+        return null
+    }
+
+    release(claim) {
+        // if there is no current claim for the given
+        // sleeve id, there is nothing to release so
+        // technically we consider the claim successfull
+        if (!(claim.id in this.#claims)) {
+            return true
+        }
+
+        const contestedClaim = this.#claims[claim.id]
+        // check if the claims have different owners
+        // if so, fail as only the original owner of a claim
+        // can release it
+        if (contestedClaim.owner != claim.owner) {
+            return false
+        }
+
+        // if the task object of the provided and the
+        // contested claim are exactly the same (which could
+        // be the case for a claim on an idle task as the
+        // idle task is null), then the claim release
+        // has been validated and we can release the claim
+        if (contestedClaim.task == claim.task) {
+            delete this.#claims[contestedClaim.id]
+            return true
+        }
+        // check if all fields of the contested claim
+        // match the same fields in the provided claim
+        // if not, we are dealing with different claims
+        // and we cannot release the contested claim
+        Object.keys(contestedClaim).forEach(key => {
+            if (contestedClaim[key] != claim[key]) {
+                return false
+            }
+        })
+
+        // the provided claim matches the contested claim
+        // so we can relaese the contested claim
+        delete this.#claims[contestedClaim.id]
+        return true
+    }
+
+    break(id) {
+        if (id in this.#claims) {
+            delete this.#claims[contestedClaim.id]
+        }
+    }
+
+    breakAll() {
+        SleeveClaims.validIDs.forEach(id => {
+            this.break(id)
+        })
     }
 }

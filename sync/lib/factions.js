@@ -10,10 +10,16 @@ export class Faction {
     #ns
     #army
 
-    /** @param {import("../..").NS } ns */
-    constructor(ns) {
+    /**
+     * @param {import("../..").NS } ns
+     * @param {import("sleeves.js").SleeveArmy } army
+     */
+    constructor(ns, army) {
         this.#ns = ns
-        this.#army = new SleeveArmy(ns)
+        this.#army = army
+        if (!this.#army) {
+            this.#army = new SleeveArmy(ns)
+        }
         this.join()
     }
 

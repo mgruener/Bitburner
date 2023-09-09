@@ -4,10 +4,30 @@ import {
 
 /** @param {import("../..").NS } ns */
 export async function main(ns) {
-    var max = 0
-    if (ns.args.length > 0) {
-        max = ns.args[0]
-    }
     const army = new SleeveArmy(ns)
-    army.augmentAll()
+    const sleeves = {}
+    army.forAllSleeves(function (army, id) {
+        sleeves[id] = army.setToCommitCrime("Heist", "testscript")
+        if (sleeves[id] == null) {
+            army.ns.tprintf("Fail: %i", id)
+        } else {
+            army.ns.tprintf("Sucecss: %i", id)
+        }
+    })
+
+    let claim = army.setToCommitCrime("Shoplift", "testscript")
+    if (claim == null) {
+        ns.tprintf("Failed to send another sleeve shoplifting")
+    }
+    sleeves["3"].release()
+    claim = army.setToCommitCrime("Shoplift", "testscript")
+    if (claim == null) {
+        ns.tprintf("Failed to send another sleeve shoplifting again")
+    } else {
+        ns.tprintf("Send sleeve %s shopliftig", claim.id)
+    }
+
+    Object.values(sleeves).forEach(claim => {
+        claim.release()
+    })
 }
