@@ -34,14 +34,16 @@ export class Server {
 
         // we already have admin rights, try to backdoor the server
         if (this.#server.hasAdminRights) {
-            return await this.#backdoor()
+            let result = await this.#backdoor()
+            return result
         }
 
         // we do not have admin rights, maybe we can get them
-        if (this.#nuke) {
+        if (this.#nuke()) {
             // we succeeded in getting admin rights, lets try
             // installing a backdoor on the server
-            return await this.#backdoor()
+            let result = await this.#backdoor()
+            return result
         }
 
         // we failed even with getting admin rights
@@ -83,7 +85,7 @@ export class Server {
             darkweb.buyPortOpener()
 
             // open as many ports as possible
-            const po = portOpener(ns)
+            const po = portOpener(this.#ns)
             for (let attack of po) {
                 if (attack["check"](this.#server)) {
                     attack["func"](this.#hostname)
@@ -97,7 +99,7 @@ export class Server {
     }
 
     #update() {
-        this.#server = ns.getServer(this.#hostname)
+        this.#server = this.#ns.getServer(this.#hostname)
         return this.#server
     }
 }

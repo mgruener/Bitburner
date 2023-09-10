@@ -43,52 +43,66 @@ export class Faction {
         this.sleevesIncreaseReputation()
     }
 
-    playerIncreaseReputation() { }
-    sleevesIncreaseReputation() { }
+    playerIncreaseReputation(workType) {
+        if (!this.joined()) {
+            return
+        }
+        this.ns.singularity.workForFaction(this.constructor.name, workType, false)
+    }
+    sleevesIncreaseReputation(workType) {
+        if (!this.joined()) {
+            return
+        }
+        this.army.setToFactionWork(this.constructor.name, workType ? workType : "security")
+    }
 
     async fullfillRequirements() { }
 
     join() {
-        return this.ns.singularity.joinFaction(this.name)
+        if (this.joined()) {
+            return true
+        }
+        return this.ns.singularity.joinFaction(this.constructor.name)
+    }
+
+    joined() {
+        return this.ns.getPlayer().factions.includes(this.constructor.name)
     }
 
     travel() {
-        if (this.location != "") {
-            this.ns.singularity.travelToCity(this.location)
+        if (this.constructor.location != "") {
+            this.ns.singularity.travelToCity(this.constructor.location)
         }
     }
 
     connect() {
-        if (this.server != "") {
-            const server = new Server(this.ns, this.server())
+        if (this.constructor.server != "") {
+            const server = new Server(this.ns, this.constructor.server)
             server.connect()
         }
     }
 }
 
 // Early Game Factions
-export class CyberSec extends Faction {
-    static get name() { return "CyberSec" }
-    static get server() { return "CSEC" }
-
-    requirementsFullfilled() {
-        const server = this.ns.getServer(this.server())
-        return server.backdoorInstalled
-    }
-
-    async fullfillRequirements() {
-        const server = new Server(this.ns, this.server())
-        await server.crack()
-    }
-
-    playerIncreaseReputation() {
-        this.ns.singularity.workForFaction(this.name, "hacking", false)
-    }
-}
-
 export class TianDiHui extends Faction {
     static get name() { return "Tian Di Hui" }
     static get location() { return Chongqing.name }
+
+    requirementsFullfilled() {
+        const moneyNeeded = 1000000
+        const hackingNeeded = 50
+        const player = this.ns.getPlayer()
+        const hacking = player.skills.hacking
+        const money = player.money
+        const location = player.location
+        return (money == moneyNeeded) && (hacking == hackingNeeded) && (location == this.constructor.location)
+    }
+
+    async fullfillRequirements() {
+        if (!this.joined()) {
+            this.travel()
+        }
+    }
 }
 
 export class Netburners extends Faction {
@@ -100,142 +114,191 @@ export class ShadowsOfAnarchy extends Faction {
 }
 
 // City Factions
-export class Sector12 extends Faction {
+export class CityFaction extends Faction {
+    #moneyNeeded
+    #incompatibleFactions
+    constructor(ns, army, moneyNeeded, incompatibleFactions) {
+        super(ns, army)
+        this.#moneyNeeded = moneyNeeded
+        this.#incompatibleFactions = incompatibleFactions
+    }
+
+    canFullfillRequirements() {
+        const factions = this.ns.getPlayer().factions
+        this.#incompatibleFactions.forEach(faction => {
+            if (factions.includes(faction)) {
+                return false
+            }
+        })
+        return true
+    }
+
+    requirementsFullfilled() {
+        const player = this.ns.getPlayer()
+        const money = player.money
+        const location = player.location
+        return (money == this.#moneyNeeded) && (location == this.constructor.location)
+    }
+
+    async fullfillRequirements() {
+        if (!this.joined()) {
+            this.travel()
+        }
+    }
+}
+
+export class Sector12 extends CityFaction {
     static get name() { return "Sector-12" }
     static get location() { return Sector12.name }
 
-    canFullfillRequirements() {
-        const factions = this.ns.getPlayer().factions
-        const incompatibleFactions = [
-            Chongqing.name,
-            NewTokyo.name,
-            Ishima.name,
-            Volhaven.name
-        ]
-        incompatibleFactions.forEach(faction => {
-            if (factions.includes(faction)) {
-                return false
-            }
-        })
-        return true
+    constructor(ns, army) {
+        super(
+            ns,
+            army,
+            15000000,
+            [
+                Chongqing.name,
+                NewTokyo.name,
+                Ishima.name,
+                Volhaven.name
+            ]
+        )
     }
+
 }
 
-export class Aevum extends Faction {
+export class Aevum extends CityFaction {
     static get name() { return "Aevum" }
     static get location() { return Aevum.name }
 
-    canFullfillRequirements() {
-        const factions = this.ns.getPlayer().factions
-        const incompatibleFactions = [
-            Chongqing.name,
-            NewTokyo.name,
-            Ishima.name,
-            Volhaven.name
-        ]
-        incompatibleFactions.forEach(faction => {
-            if (factions.includes(faction)) {
-                return false
-            }
-        })
-        return true
+    constructor(ns, army) {
+        super(
+            ns,
+            army,
+            40000000,
+            [
+                Chongqing.name,
+                NewTokyo.name,
+                Ishima.name,
+                Volhaven.name
+            ]
+        )
     }
 }
 
-export class Chongqing extends Faction {
+export class Chongqing extends CityFaction {
     static get name() { return "Chongqing" }
     static get location() { return Chongqing.name }
 
-    canFullfillRequirements() {
-        const factions = this.ns.getPlayer().factions
-        const incompatibleFactions = [
-            Sector12.name,
-            Aevum.name,
-            Volhaven.name
-        ]
-        incompatibleFactions.forEach(faction => {
-            if (factions.includes(faction)) {
-                return false
-            }
-        })
-        return true
+    constructor(ns, army) {
+        super(
+            ns,
+            army,
+            20000000,
+            [
+                Sector12.name,
+                Aevum.name,
+                Volhaven.name
+            ]
+        )
     }
 }
 
-export class NewTokyo extends Faction {
+export class NewTokyo extends CityFaction {
     static get name() { return "New Tokyo" }
     static get location() { return NewTokyo.name }
 
-    canFullfillRequirements() {
-        const factions = this.ns.getPlayer().factions
-        const incompatibleFactions = [
-            Sector12.name,
-            Aevum.name,
-            Volhaven.name
-        ]
-        incompatibleFactions.forEach(faction => {
-            if (factions.includes(faction)) {
-                return false
-            }
-        })
-        return true
+    constructor(ns, army) {
+        super(
+            ns,
+            army,
+            20000000,
+            [
+                Sector12.name,
+                Aevum.name,
+                Volhaven.name
+            ]
+        )
     }
 }
 
-export class Ishima extends Faction {
+export class Ishima extends CityFaction {
     static get name() { return "Ishima" }
     static get location() { return Ishima.name }
 
-    canFullfillRequirements() {
-        const factions = this.ns.getPlayer().factions
-        const incompatibleFactions = [
-            Sector12.name,
-            Aevum.name,
-            Volhaven.name
-        ]
-        incompatibleFactions.forEach(faction => {
-            if (factions.includes(faction)) {
-                return false
-            }
-        })
-        return true
+    constructor(ns, army) {
+        super(
+            ns,
+            army,
+            30000000,
+            [
+                Sector12.name,
+                Aevum.name,
+                Volhaven.name
+            ]
+        )
     }
 }
 
-export class Volhaven extends Faction {
+export class Volhaven extends CityFaction {
     static get name() { return "Volhaven" }
     static get location() { return Volhaven.name }
 
-    canFullfillRequirements() {
-        const factions = this.ns.getPlayer().factions
-        const incompatibleFactions = [
-            Sector12.name,
-            Aevum.name,
-            Chongqing.name,
-            NewTokyo.name,
-            Ishima.name
-        ]
-        incompatibleFactions.forEach(faction => {
-            if (factions.includes(faction)) {
-                return false
-            }
-        })
-        return true
+    constructor(ns, army) {
+        super(
+            ns,
+            army,
+            50000000,
+            [
+                Sector12.name,
+                Aevum.name,
+                Chongqing.name,
+                NewTokyo.name,
+                Ishima.name
+            ]
+        )
     }
 }
 
 // Hacking Groups
-export class NiteSec extends Faction {
+export class HackingFaction extends Faction {
+    requirementsFullfilled() {
+        const server = this.ns.getServer(this.constructor.server)
+        return server.backdoorInstalled
+    }
+
+    async fullfillRequirements() {
+        if (!this.joined()) {
+            const server = new Server(this.ns, this.constructor.server)
+            await server.crack()
+        }
+    }
+
+    playerIncreaseReputation(workType) {
+        super.playerIncreaseReputation(workType ? workType : "hacking")
+    }
+
+    sleevesIncreaseReputation(workType) {
+        super.sleevesIncreaseReputation(workType ? workType : "hacking")
+    }
+}
+
+export class CyberSec extends HackingFaction {
+    static get name() { return "CyberSec" }
+    static get server() { return "CSEC" }
+}
+
+export class NiteSec extends HackingFaction {
     static get name() { return "NiteSec" }
     static get server() { return "avmnite-02h" }
 }
 
-export class TheBlackHand extends Faction {
+export class TheBlackHand extends HackingFaction {
     static get name() { return "The Black Hand" }
     static get server() { return "I.I.I.I" }
 }
 
-export class BitRunners extends Faction {
+export class BitRunners extends HackingFaction {
     static get name() { return "BitRunners" }
     static get server() { return "run4theh111z" }
 }

@@ -8,7 +8,7 @@ export class Darkweb {
     }
 
     #buyTor() {
-        if (!ns.hasTorRouter()) {
+        if (!this.#ns.hasTorRouter()) {
             return ns.singularity.purchaseTor()
         }
         return true
@@ -33,7 +33,7 @@ export class Darkweb {
 
         // try to buy programs, cheapest to most expensive
         programs.forEach(program => {
-            if (!ns.fileExists(program, "home")) {
+            if (!this.#ns.fileExists(program, "home")) {
                 this.#ns.singularity.purchaseProgram(program)
             }
         })
