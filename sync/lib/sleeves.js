@@ -52,6 +52,10 @@ export class SleeveArmy {
         }
     }
 
+    ownedClaims(owner) {
+        return this.#claims.ownedClaims(owner)
+    }
+
     purchasableAugs() {
         const result = {}
         this.forAllSleeves(function (army, id) {
@@ -247,10 +251,8 @@ export class SleeveClaim {
 
 export class SleeveClaims {
     #claims
-    #ns
-    constructor(ns) {
+    constructor() {
         this.#claims = {}
-        this.#ns = ns
     }
 
     static get validIDs() { return ["0", "1", "2", "3", "4", "5", "6", "7"] }
@@ -262,6 +264,16 @@ export class SleeveClaims {
             claimed = []
         }
         return SleeveClaims.validIDs.filter((id) => !claimed.includes(id))
+    }
+
+    ownedClaims(owner) {
+        const result = []
+        Object.values(this.#claims).forEach(claim => {
+            if (claim.owner == owner) {
+                result.push(claim)
+            }
+        })
+        return result
     }
 
     claim(id, task, owner) {

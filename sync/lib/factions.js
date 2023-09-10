@@ -9,6 +9,7 @@ import {
 export class Faction {
     #ns
     #army
+    #sleeveClaims
 
     /**
      * @param {import("../..").NS } ns
@@ -20,6 +21,10 @@ export class Faction {
         if (!this.#army) {
             this.#army = new SleeveArmy(ns)
         }
+        this.#sleeveClaims = {}
+        this.#army.ownedClaims(this.constructor.name).forEach(claim => {
+            this.#sleeveClaims[claim.task.type]
+        })
         this.join()
     }
 
@@ -29,6 +34,10 @@ export class Faction {
 
     get army() {
         return this.#army
+    }
+
+    get sleeveClaims() {
+        return this.#sleeveClaims
     }
 
     static get name() { return "" }
@@ -47,13 +56,36 @@ export class Faction {
         if (!this.joined()) {
             return
         }
-        this.ns.singularity.workForFaction(this.constructor.name, workType, false)
+        const actualWorkType = workType ? workType : "security"
+        const currentWork = this.ns.singularity.getCurrentWork()
+
+        // check if we are already working for this faction
+        if ((currentWork.type == "FACTION") && (currentWork.factionName == this.constructor.name) && (currentWork.factionWorkType == actualWorkType)) {
+            return
+        }
+        this.ns.singularity.workForFaction(this.constructor.name, actualWorkType, false)
     }
     sleevesIncreaseReputation(workType) {
         if (!this.joined()) {
             return
         }
-        this.army.setToFactionWork(this.constructor.name, workType ? workType : "security")
+
+        let claim = this.sleeveClaims["FACTION"]
+        const actualWorkType = workType ? workType : "security"
+        // we already have a sleeve that is doing the expected work for the faction
+        // no need to do anything
+        if (claim && (claim.task["factionWorkType"] == actualWorkType)) {
+            return
+        }
+
+        // we already have a sleeve working for this faction, but it is not doing
+        // the right work so we need to release the claim so we can change the task of the
+        // sleeve
+        if (claim) {
+            claim.release()
+        }
+        claim = this.army.setToFactionWork(this.constructor.name, actualWorkType, this.constructor.name)
+        this.#sleeveClaims["FACTION"] = claim
     }
 
     async fullfillRequirements() { }
@@ -296,6 +328,14 @@ export class NiteSec extends HackingFaction {
 export class TheBlackHand extends HackingFaction {
     static get name() { return "The Black Hand" }
     static get server() { return "I.I.I.I" }
+
+    playerIncreaseReputation(workType) {
+        super.playerIncreaseReputation(workType ? workType : "field")
+    }
+
+    sleevesIncreaseReputation(workType) {
+        super.sleevesIncreaseReputation(workType ? workType : "field")
+    }
 }
 
 export class BitRunners extends HackingFaction {
@@ -304,64 +344,113 @@ export class BitRunners extends HackingFaction {
 }
 
 // Megacorporations
-export class ECorp extends Faction {
+export class MegaCorporation extends Faction {
+    requirementsFullfilled() {
+        return (this.ns.singularity.getCompanyRep(this.constructor.name) >= 400000)
+    }
+
+    async fullfillRequirements() {
+        if (!this.joined()) {
+            this.travel()
+            // try to start working for this company or try to get an promotion
+            this.ns.singularity.applyToCompany(this.constructor.name, "Security")
+            const currentWork = this.ns.singularity.getCurrentWork()
+
+            // if we are not currently working for this company, start working for it
+            if (!((currentWork.type == "COMPANY") && (currentWork.companyName == this.constructor.name))) {
+                this.ns.singularity.workForCompany(this.constructor.name, false)
+            }
+
+            // if none of our sleeves is currently working for this company, instruct one to work for it
+            if (!this.sleeveClaims["COMPANY"]) {
+                const claim = this.army.setToCompanyWork(this.constructor.name, this.constructor.name)
+                this.sleeveClaims["COMPANY"] = claim
+            }
+        }
+    }
+
+    playerIncreaseReputation(workType) {
+        super.playerIncreaseReputation(workType ? workType : "security")
+    }
+
+    sleevesIncreaseReputation(workType) {
+        if (this.sleeveClaims["COMPANY"]) {
+            this.sleeveClaims["COMPANY"].release()
+        }
+        super.sleevesIncreaseReputation(workType ? workType : "security")
+    }
+}
+
+export class ECorp extends MegaCorporation {
     static get name() { return "ECorp" }
     static get location() { return Aevum.name }
     static get server() { return "ecorp" }
 }
 
-export class MegaCorp extends Faction {
+export class MegaCorp extends MegaCorporation {
     static get name() { return "MegaCorp" }
     static get location() { return Sector12.name }
     static get server() { return "megacorp" }
 }
 
-export class KuaiGongInternational extends Faction {
+export class KuaiGongInternational extends MegaCorporation {
     static get name() { return "KuaiGong International" }
     static get location() { return Chongqing.name }
     static get server() { return "kuai-gong" }
 }
 
-export class FourSigma extends Faction {
+export class FourSigma extends MegaCorporation {
     static get name() { return "Four Sigma" }
     static get location() { return Sector12.name }
     static get server() { return "4sigma" }
 }
 
-export class NWO extends Faction {
+export class NWO extends MegaCorporation {
     static get name() { return "NWO" }
     static get location() { return Volhaven.name }
     static get server() { return "nwo" }
 }
 
-export class BladeIndustries extends Faction {
+export class BladeIndustries extends MegaCorporation {
     static get name() { return "Blade Industries" }
     static get location() { return Sector12.name }
     static get server() { return "blade" }
 }
 
-export class OmniTekIncorporated extends Faction {
+export class OmniTekIncorporated extends MegaCorporation {
     static get name() { return "OmniTek Incorporated" }
     static get location() { return Volhaven.name }
     static get server() { return "omnitek" }
 }
 
-export class BachmanAndAssociates extends Faction {
+export class BachmanAndAssociates extends MegaCorporation {
     static get name() { return "Bachman & Associates" }
     static get location() { return Aevum.name }
     static get server() { return "b-and-a" }
 }
 
-export class ClarkeIncorporated extends Faction {
+export class ClarkeIncorporated extends MegaCorporation {
     static get name() { return "Clarke Incorporated" }
     static get location() { return Aevum.name }
     static get server() { return "clarkinc" }
 }
 
-export class FulcrumSecretTechnologies extends Faction {
+export class FulcrumSecretTechnologies extends MegaCorporation {
     static get name() { return "Fulcrum Secret Technologies" }
     static get location() { return Aevum.name }
     static get server() { return "fulcrumtech" }
+
+    requirementsFullfilled() {
+        const reputationFullfilled = super.requirementsFullfilled()
+        const server = this.ns.getServer("fulcrumassets")
+        return server.backdoorInstalled && reputationFullfilled
+    }
+
+    async fullfillRequirements() {
+        super.fullfillRequirements()
+        const server = new Server(this.ns, "fulcrumassets")
+        await server.crack()
+    }
 }
 
 // Criminal Organizations
