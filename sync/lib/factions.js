@@ -45,7 +45,9 @@ export class Faction {
     static get server() { return "" }
 
     canFullfillRequirements() { return true }
-    requirementsFullfilled() { return false }
+    requirementsFullfilled() {
+        return this.canFullfillRequirements()
+    }
 
     increaseReputation() {
         this.playerIncreaseReputation()
@@ -121,6 +123,9 @@ export class TianDiHui extends Faction {
     static get location() { return Chongqing.name }
 
     requirementsFullfilled() {
+        if (!super.requirementsFullfilled()) {
+            return false
+        }
         const moneyNeeded = 1000000
         const hackingNeeded = 50
         const player = this.ns.getPlayer()
@@ -166,6 +171,9 @@ export class CityFaction extends Faction {
     }
 
     requirementsFullfilled() {
+        if (!super.requirementsFullfilled()) {
+            return false
+        }
         const player = this.ns.getPlayer()
         const money = player.money
         const location = player.location
@@ -295,6 +303,9 @@ export class Volhaven extends CityFaction {
 // Hacking Groups
 export class HackingFaction extends Faction {
     requirementsFullfilled() {
+        if (!super.requirementsFullfilled()) {
+            return false
+        }
         const server = this.ns.getServer(this.constructor.server)
         return server.backdoorInstalled
     }
@@ -346,6 +357,9 @@ export class BitRunners extends HackingFaction {
 // Megacorporations
 export class MegaCorporation extends Faction {
     requirementsFullfilled() {
+        if (!super.requirementsFullfilled()) {
+            return false
+        }
         return (this.ns.singularity.getCompanyRep(this.constructor.name) >= 400000)
     }
 
@@ -453,27 +467,199 @@ export class FulcrumSecretTechnologies extends MegaCorporation {
     }
 }
 
-// Criminal Organizations
-export class SlumSnakes extends Faction {
-    static get name() { return "Slum Snakes" }
+export class CriminalOrganization extends Faction {
+    // TODO: move most of this to the top level Faction class
+    //       as most factions can use this
+    #shouldMoney
+    #shouldSkills
+    #shouldKill
+    #shouldKarma
+    #incompatibleFactions
+    constructor(ns, army, shouldKarma, shouldMoney, shouldSkills, shouldKill, incompatibleFactions) {
+        super(ns, army)
+        this.#shouldMoney = shouldMoney
+        this.#shouldSkills = shouldSkills
+        this.#shouldKill = shouldKill
+        this.#shouldKarma = shouldKarma
+        this.#incompatibleFactions = incompatibleFactions
+    }
+
+    canFullfillRequirements() {
+        const factions = this.ns.getPlayer().factions
+        this.#incompatibleFactions.forEach(faction => {
+            if (factions.includes(faction)) {
+                return false
+            }
+        })
+        return true
+    }
+
+    requirementsFullfilled() {
+        if (!super.requirementsFullfilled()) {
+            return false
+        }
+        if (this.#shouldKarma) {
+            const karma = this.ns.heart.break()
+            if (karma > this.#shouldKarma) {
+                return false
+            }
+        }
+        const player = this.ns.getPlayer()
+        if (this.#shouldMoney) {
+            const money = player.money
+            if (money < this.#shouldMoney) {
+                return false
+            }
+        }
+        if (this.constructor.location) {
+            const location = player.location
+            if (location != this.constructor.location) {
+                return false
+            }
+        }
+        if (this.#shouldSkills) {
+            Object.keys(this.#shouldSkills).forEach(skill => {
+                if (player.skills[skill] < this.#shouldSkills[skill]) {
+                    return false
+                }
+            })
+        }
+        if (this.#shouldKill) {
+            if (player.numPeopleKilled < this.#shouldKill) {
+                return false
+            }
+        }
+    }
+
+    async fullfillRequirements() {
+        if (!this.joined()) {
+            this.travel()
+            this.reduceKarma()
+        }
+    }
+
+    reduceKarma() {
+        if (this.ns.heart.break() > this.constructor.karma) {
+            this.ns.singularity.commitCrime("homicide", false)
+        }
+    }
 }
-export class Tetrads extends Faction {
+
+// Criminal Organizations
+export class SlumSnakes extends CriminalOrganization {
+    static get name() { return "Slum Snakes" }
+    static get karma() { return -9 }
+
+    constructor(ns, army) {
+        const karma = -9
+        const money = 1000000
+        const combatLevel = 30
+        const skills = {
+            "agility": combatLevel,
+            "defense": combatLevel,
+            "dexterity": combatLevel,
+            "strength": combatLevel,
+        }
+        super(ns, army, karma, money, skills)
+    }
+}
+export class Tetrads extends FacCriminalOrganizationtion {
     static get name() { return "Tetrads" }
     static get location() { return Chongqing.name }
+
+    constructor(ns, army) {
+        const karma = -18
+        const money = null
+        const combatLevel = 75
+        const skills = {
+            "agility": combatLevel,
+            "defense": combatLevel,
+            "dexterity": combatLevel,
+            "strength": combatLevel,
+        }
+        super(ns, army, karma, money, skills)
+    }
 }
-export class Silhouette extends Faction {
+export class Silhouette extends CriminalOrganization {
     static get name() { return "Silhouette" }
+
+    constructor(ns, army) {
+        const karma = -22
+        const money = 15000000
+        super(ns, army, karma, money)
+    }
+
+    requirementsFullfilled() {
+        if (!super.requirementsFullfilled()) {
+            return false
+        }
+        // TODO: check if we are CTO, CFO or CEO of a company
+    }
+
+    async fullfillRequirements() {
+        super.fullfillRequirements()
+
+        // TODO: become CTO, CFO or CEO of a company
+    }
 }
-export class SpeakersForTheDead extends Faction {
+export class SpeakersForTheDead extends CriminalOrganization {
     static get name() { return "Speakers for the Dead" }
+
+    constructor(ns, army) {
+        const karma = -45
+        const money = null
+        const combatLevel = 300
+        const skills = {
+            "hacking": 100,
+            "agility": combatLevel,
+            "defense": combatLevel,
+            "dexterity": combatLevel,
+            "strength": combatLevel,
+        }
+        const shouldKill = 30
+        const incompatibleFactions = ["NSA", "CIA"]
+        super(ns, army, karma, money, skills, shouldKill, incompatibleFactions)
+    }
 }
-export class TheDarkArmy extends Faction {
+export class TheDarkArmy extends CriminalOrganization {
     static get name() { return "The Dark Army" }
     static get location() { return Chongqing.name }
+
+    constructor(ns, army) {
+        const karma = -45
+        const money = null
+        const combatLevel = 300
+        const skills = {
+            "hacking": 300,
+            "agility": combatLevel,
+            "defense": combatLevel,
+            "dexterity": combatLevel,
+            "strength": combatLevel,
+        }
+        const shouldKill = 5
+        const incompatibleFactions = ["NSA", "CIA"]
+        super(ns, army, karma, money, skills, shouldKill, incompatibleFactions)
+    }
+
 }
-export class TheSyndicate extends Faction {
+export class TheSyndicate extends CriminalOrganization {
     static get name() { return "The Syndicate" }
     static get location() { return Aevum.name }
+
+    constructor(ns, army) {
+        const karma = -90
+        const money = 10000000
+        const combatLevel = 200
+        const skills = {
+            "hacking": 200,
+            "agility": combatLevel,
+            "defense": combatLevel,
+            "dexterity": combatLevel,
+            "strength": combatLevel,
+        }
+        const incompatibleFactions = ["NSA", "CIA"]
+        super(ns, army, karma, money, skills, null, incompatibleFactions)
+    }
 }
 
 // Endgame Factions
