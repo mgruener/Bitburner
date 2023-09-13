@@ -10,12 +10,17 @@ export class Faction {
     #ns
     #army
     #sleeveClaims
+    #shouldMoney
+    #shouldSkills
+    #shouldKill
+    #shouldKarma
+    #incompatibleFactions
 
     /**
      * @param {import("../..").NS } ns
      * @param {import("sleeves.js").SleeveArmy } army
      */
-    constructor(ns, army) {
+    constructor(ns, army, shouldMoney, shouldSkills, shouldKarma, shouldKill, incompatibleFactions) {
         this.#ns = ns
         this.#army = army
         if (!this.#army) {
@@ -25,6 +30,12 @@ export class Faction {
         this.#army.ownedClaims(this.constructor.name).forEach(claim => {
             this.#sleeveClaims[claim.task.type]
         })
+        this.#shouldMoney = shouldMoney
+        this.#shouldSkills = shouldSkills
+        this.#shouldKill = shouldKill
+        this.#shouldKarma = shouldKarma
+        this.#incompatibleFactions = incompatibleFactions
+
         this.join()
     }
 
@@ -44,9 +55,53 @@ export class Faction {
     static get location() { return "" }
     static get server() { return "" }
 
-    canFullfillRequirements() { return true }
+    canFullfillRequirements() {
+        if (this.#incompatibleFactions) {
+            const factions = this.ns.getPlayer().factions
+            this.#incompatibleFactions.forEach(faction => {
+                if (factions.includes(faction)) {
+                    return false
+                }
+            })
+        }
+        return true
+    }
+
     requirementsFullfilled() {
-        return this.canFullfillRequirements()
+        if (!this.canFullfillRequirements()) {
+            return false
+        }
+        if (this.#shouldKarma) {
+            const karma = this.ns.heart.break()
+            if (karma > this.#shouldKarma) {
+                return false
+            }
+        }
+        const player = this.ns.getPlayer()
+        if (this.#shouldMoney) {
+            const money = player.money
+            if (money < this.#shouldMoney) {
+                return false
+            }
+        }
+        if (this.constructor.location) {
+            const location = player.location
+            if (location != this.constructor.location) {
+                return false
+            }
+        }
+        if (this.#shouldSkills) {
+            Object.keys(this.#shouldSkills).forEach(skill => {
+                if (player.skills[skill] < this.#shouldSkills[skill]) {
+                    return false
+                }
+            })
+        }
+        if (this.#shouldKill) {
+            if (player.numPeopleKilled < this.#shouldKill) {
+                return false
+            }
+        }
     }
 
     increaseReputation() {
@@ -60,6 +115,7 @@ export class Faction {
         }
         const actualWorkType = workType ? workType : "security"
         const currentWork = this.ns.singularity.getCurrentWork()
+        this.#ns.tprintf("Personally increasing reputation for: %s (%s)", this.constructor.name, actualWorkType)
 
         // check if we are already working for this faction
         if ((currentWork.type == "FACTION") && (currentWork.factionName == this.constructor.name) && (currentWork.factionWorkType == actualWorkType)) {
@@ -67,6 +123,7 @@ export class Faction {
         }
         this.ns.singularity.workForFaction(this.constructor.name, actualWorkType, false)
     }
+
     sleevesIncreaseReputation(workType) {
         if (!this.joined()) {
             return
@@ -74,6 +131,7 @@ export class Faction {
 
         let claim = this.sleeveClaims["FACTION"]
         const actualWorkType = workType ? workType : "security"
+        this.#ns.tprintf("Tasking a sleeve to  increase reputation for: %s (%s)", this.constructor.name, actualWorkType)
         // we already have a sleeve that is doing the expected work for the faction
         // no need to do anything
         if (claim && (claim.task["factionWorkType"] == actualWorkType)) {
@@ -87,15 +145,30 @@ export class Faction {
             claim.release()
         }
         claim = this.army.setToFactionWork(this.constructor.name, actualWorkType, this.constructor.name)
+        if (!claim) {
+            this.#ns.tprintf("No sleeve available")
+        }
         this.#sleeveClaims["FACTION"] = claim
     }
 
-    async fullfillRequirements() { }
+    async fullfillRequirements() {
+        this.#ns.tprintf("Fullfilling requirements for: %s", this.constructor.name)
+        if (!this.joined()) {
+            this.travel()
+            return
+        }
+        this.#ns.tprintf("  Already joined: %s", this.constructor.name)
+    }
 
     join() {
         if (this.joined()) {
             return true
         }
+        if (!this.#ns.singularity.checkFactionInvitations().includes(this.constructor.name)) {
+            this.#ns.tprintf("No faction invitation for: %s", this.constructor.name)
+            return false
+        }
+        this.#ns.tprintf("Joining: %s", this.constructor.name)
         return this.ns.singularity.joinFaction(this.constructor.name)
     }
 
@@ -105,15 +178,41 @@ export class Faction {
 
     travel() {
         if (this.constructor.location != "") {
+            this.#ns.tprintf("Traveling to: %s (%s)", this.constructor.location, this.constructor.name)
             this.ns.singularity.travelToCity(this.constructor.location)
         }
     }
 
     connect() {
         if (this.constructor.server != "") {
+            this.#ns.tprintf("Connecting to server: %s (%s)", this.constructor.location, this.constructor.name)
             const server = new Server(this.ns, this.constructor.server)
             server.connect()
         }
+    }
+
+    haveAllAugs() {
+        const factionAugs = this.#ns.singularity.getAugmentationsFromFaction(this.constructor.name).filter((a) => !a.startsWith("NeuroFlux Governor"))
+        const playerAugs = this.#ns.singularity.getOwnedAugmentations(true).filter((a) => !a.startsWith("NeuroFlux Governor"))
+
+        factionAugs.forEach(factionAug => {
+            if (!playerAugs.includes(factionAug)) {
+                return false
+            }
+        })
+    }
+
+    haveMaxAugRep() {
+        const rep = this.#ns.singularity.getFactionRep(this.constructor.name)
+        const factionAugs = this.#ns.singularity.getAugmentationsFromFaction(this.constructor.name).filter((a) => !a.startsWith("NeuroFlux Governor"))
+        const playerAugs = this.#ns.singularity.getOwnedAugmentations(true).filter((a) => !a.startsWith("NeuroFlux Governor"))
+
+        factionAugs.forEach(aug => {
+            const requiredRep = this.#ns.singularity.getAugmentationRepReq(aug)
+            if (!playerAugs.includes(aug) && (requiredRep > rep)) {
+                return false
+            }
+        })
     }
 }
 
@@ -122,23 +221,12 @@ export class TianDiHui extends Faction {
     static get name() { return "Tian Di Hui" }
     static get location() { return Chongqing.name }
 
-    requirementsFullfilled() {
-        if (!super.requirementsFullfilled()) {
-            return false
+    constructor(ns, army) {
+        const money = 1000000
+        const skills = {
+            "hacking": 50,
         }
-        const moneyNeeded = 1000000
-        const hackingNeeded = 50
-        const player = this.ns.getPlayer()
-        const hacking = player.skills.hacking
-        const money = player.money
-        const location = player.location
-        return (money == moneyNeeded) && (hacking == hackingNeeded) && (location == this.constructor.location)
-    }
-
-    async fullfillRequirements() {
-        if (!this.joined()) {
-            this.travel()
-        }
+        super(ns, army, money, skills)
     }
 }
 
@@ -151,152 +239,98 @@ export class ShadowsOfAnarchy extends Faction {
 }
 
 // City Factions
-export class CityFaction extends Faction {
-    #moneyNeeded
-    #incompatibleFactions
-    constructor(ns, army, moneyNeeded, incompatibleFactions) {
-        super(ns, army)
-        this.#moneyNeeded = moneyNeeded
-        this.#incompatibleFactions = incompatibleFactions
-    }
-
-    canFullfillRequirements() {
-        const factions = this.ns.getPlayer().factions
-        this.#incompatibleFactions.forEach(faction => {
-            if (factions.includes(faction)) {
-                return false
-            }
-        })
-        return true
-    }
-
-    requirementsFullfilled() {
-        if (!super.requirementsFullfilled()) {
-            return false
-        }
-        const player = this.ns.getPlayer()
-        const money = player.money
-        const location = player.location
-        return (money == this.#moneyNeeded) && (location == this.constructor.location)
-    }
-
-    async fullfillRequirements() {
-        if (!this.joined()) {
-            this.travel()
-        }
-    }
-}
-
-export class Sector12 extends CityFaction {
+export class Sector12 extends Faction {
     static get name() { return "Sector-12" }
     static get location() { return Sector12.name }
 
     constructor(ns, army) {
-        super(
-            ns,
-            army,
-            15000000,
-            [
-                Chongqing.name,
-                NewTokyo.name,
-                Ishima.name,
-                Volhaven.name
-            ]
-        )
+        const money = 15000000
+        const incompatibleFactions = [
+            Chongqing.name,
+            NewTokyo.name,
+            Ishima.name,
+            Volhaven.name
+        ]
+        super(ns, army, money, null, null, null, incompatibleFactions)
     }
 
 }
 
-export class Aevum extends CityFaction {
+export class Aevum extends Faction {
     static get name() { return "Aevum" }
     static get location() { return Aevum.name }
 
     constructor(ns, army) {
-        super(
-            ns,
-            army,
-            40000000,
-            [
-                Chongqing.name,
-                NewTokyo.name,
-                Ishima.name,
-                Volhaven.name
-            ]
-        )
+        const money = 40000000
+        const incompatibleFactions = [
+            Chongqing.name,
+            NewTokyo.name,
+            Ishima.name,
+            Volhaven.name
+        ]
+        super(ns, army, money, null, null, null, incompatibleFactions)
     }
 }
 
-export class Chongqing extends CityFaction {
+export class Chongqing extends Faction {
     static get name() { return "Chongqing" }
     static get location() { return Chongqing.name }
 
     constructor(ns, army) {
-        super(
-            ns,
-            army,
-            20000000,
-            [
-                Sector12.name,
-                Aevum.name,
-                Volhaven.name
-            ]
-        )
+        const money = 20000000
+        const incompatibleFactions = [
+            Sector12.name,
+            Aevum.name,
+            Volhaven.name
+        ]
+        super(ns, army, money, null, null, null, incompatibleFactions)
     }
 }
 
-export class NewTokyo extends CityFaction {
+export class NewTokyo extends Faction {
     static get name() { return "New Tokyo" }
     static get location() { return NewTokyo.name }
 
     constructor(ns, army) {
-        super(
-            ns,
-            army,
-            20000000,
-            [
-                Sector12.name,
-                Aevum.name,
-                Volhaven.name
-            ]
-        )
+        const money = 20000000
+        const incompatibleFactions = [
+            Sector12.name,
+            Aevum.name,
+            Volhaven.name
+        ]
+        super(ns, army, money, null, null, null, incompatibleFactions)
     }
 }
 
-export class Ishima extends CityFaction {
+export class Ishima extends Faction {
     static get name() { return "Ishima" }
     static get location() { return Ishima.name }
 
     constructor(ns, army) {
-        super(
-            ns,
-            army,
-            30000000,
-            [
-                Sector12.name,
-                Aevum.name,
-                Volhaven.name
-            ]
-        )
+        const money = 30000000
+        const incompatibleFactions = [
+            Sector12.name,
+            Aevum.name,
+            Volhaven.name
+        ]
+        super(ns, army, money, null, null, null, incompatibleFactions)
     }
 }
 
-export class Volhaven extends CityFaction {
+export class Volhaven extends Faction {
     static get name() { return "Volhaven" }
     static get location() { return Volhaven.name }
 
     constructor(ns, army) {
-        super(
-            ns,
-            army,
-            50000000,
-            [
-                Sector12.name,
-                Aevum.name,
-                Chongqing.name,
-                NewTokyo.name,
-                Ishima.name
-            ]
-        )
+        const money = 50000000
+        const incompatibleFactions = [
+            Sector12.name,
+            Aevum.name,
+            Chongqing.name,
+            NewTokyo.name,
+            Ishima.name
+        ]
+        super(ns, army, money, null, null, null, incompatibleFactions)
     }
 }
 
@@ -364,8 +398,8 @@ export class MegaCorporation extends Faction {
     }
 
     async fullfillRequirements() {
+        super.fullfillRequirements()
         if (!this.joined()) {
-            this.travel()
             // try to start working for this company or try to get an promotion
             this.ns.singularity.applyToCompany(this.constructor.name, "Security")
             const currentWork = this.ns.singularity.getCurrentWork()
@@ -462,78 +496,17 @@ export class FulcrumSecretTechnologies extends MegaCorporation {
 
     async fullfillRequirements() {
         super.fullfillRequirements()
-        const server = new Server(this.ns, "fulcrumassets")
-        await server.crack()
+        if (!this.joined()) {
+            const server = new Server(this.ns, "fulcrumassets")
+            await server.crack()
+        }
     }
 }
 
 export class CriminalOrganization extends Faction {
-    // TODO: move most of this to the top level Faction class
-    //       as most factions can use this
-    #shouldMoney
-    #shouldSkills
-    #shouldKill
-    #shouldKarma
-    #incompatibleFactions
-    constructor(ns, army, shouldKarma, shouldMoney, shouldSkills, shouldKill, incompatibleFactions) {
-        super(ns, army)
-        this.#shouldMoney = shouldMoney
-        this.#shouldSkills = shouldSkills
-        this.#shouldKill = shouldKill
-        this.#shouldKarma = shouldKarma
-        this.#incompatibleFactions = incompatibleFactions
-    }
-
-    canFullfillRequirements() {
-        const factions = this.ns.getPlayer().factions
-        this.#incompatibleFactions.forEach(faction => {
-            if (factions.includes(faction)) {
-                return false
-            }
-        })
-        return true
-    }
-
-    requirementsFullfilled() {
-        if (!super.requirementsFullfilled()) {
-            return false
-        }
-        if (this.#shouldKarma) {
-            const karma = this.ns.heart.break()
-            if (karma > this.#shouldKarma) {
-                return false
-            }
-        }
-        const player = this.ns.getPlayer()
-        if (this.#shouldMoney) {
-            const money = player.money
-            if (money < this.#shouldMoney) {
-                return false
-            }
-        }
-        if (this.constructor.location) {
-            const location = player.location
-            if (location != this.constructor.location) {
-                return false
-            }
-        }
-        if (this.#shouldSkills) {
-            Object.keys(this.#shouldSkills).forEach(skill => {
-                if (player.skills[skill] < this.#shouldSkills[skill]) {
-                    return false
-                }
-            })
-        }
-        if (this.#shouldKill) {
-            if (player.numPeopleKilled < this.#shouldKill) {
-                return false
-            }
-        }
-    }
-
     async fullfillRequirements() {
+        super.fullfillRequirements()
         if (!this.joined()) {
-            this.travel()
             this.reduceKarma()
         }
     }
@@ -560,10 +533,10 @@ export class SlumSnakes extends CriminalOrganization {
             "dexterity": combatLevel,
             "strength": combatLevel,
         }
-        super(ns, army, karma, money, skills)
+        super(ns, army, money, skills, karma)
     }
 }
-export class Tetrads extends FacCriminalOrganizationtion {
+export class Tetrads extends CriminalOrganization {
     static get name() { return "Tetrads" }
     static get location() { return Chongqing.name }
 
@@ -577,7 +550,7 @@ export class Tetrads extends FacCriminalOrganizationtion {
             "dexterity": combatLevel,
             "strength": combatLevel,
         }
-        super(ns, army, karma, money, skills)
+        super(ns, army, money, skills, karma)
     }
 }
 export class Silhouette extends CriminalOrganization {
@@ -586,7 +559,7 @@ export class Silhouette extends CriminalOrganization {
     constructor(ns, army) {
         const karma = -22
         const money = 15000000
-        super(ns, army, karma, money)
+        super(ns, army, money, null, karma)
     }
 
     requirementsFullfilled() {
@@ -618,7 +591,7 @@ export class SpeakersForTheDead extends CriminalOrganization {
         }
         const shouldKill = 30
         const incompatibleFactions = ["NSA", "CIA"]
-        super(ns, army, karma, money, skills, shouldKill, incompatibleFactions)
+        super(ns, army, money, skills, karma, shouldKill, incompatibleFactions)
     }
 }
 export class TheDarkArmy extends CriminalOrganization {
@@ -638,7 +611,7 @@ export class TheDarkArmy extends CriminalOrganization {
         }
         const shouldKill = 5
         const incompatibleFactions = ["NSA", "CIA"]
-        super(ns, army, karma, money, skills, shouldKill, incompatibleFactions)
+        super(ns, army, money, skills, karma, shouldKill, incompatibleFactions)
     }
 
 }
@@ -658,7 +631,7 @@ export class TheSyndicate extends CriminalOrganization {
             "strength": combatLevel,
         }
         const incompatibleFactions = ["NSA", "CIA"]
-        super(ns, army, karma, money, skills, null, incompatibleFactions)
+        super(ns, army, money, skills, karma, null, incompatibleFactions)
     }
 }
 
