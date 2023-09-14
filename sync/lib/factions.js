@@ -28,7 +28,7 @@ export class Faction {
         }
         this.#sleeveClaims = {}
         this.#army.ownedClaims(this.constructor.name).forEach(claim => {
-            this.#sleeveClaims[claim.task.type]
+            this.#sleeveClaims[claim.task.type] = claim
         })
         this.#shouldMoney = shouldMoney
         this.#shouldSkills = shouldSkills
@@ -115,7 +115,7 @@ export class Faction {
         }
         const actualWorkType = workType ? workType : "security"
         const currentWork = this.ns.singularity.getCurrentWork()
-        this.#ns.tprintf("Personally increasing reputation for: %s (%s)", this.constructor.name, actualWorkType)
+        this.#ns.tprintf("%s: Personally increasing reputation by working in: %s", this.constructor.name, actualWorkType)
 
         // check if we are already working for this faction
         if ((currentWork.type == "FACTION") && (currentWork.factionName == this.constructor.name) && (currentWork.factionWorkType == actualWorkType)) {
@@ -131,13 +131,15 @@ export class Faction {
 
         let claim = this.sleeveClaims["FACTION"]
         const actualWorkType = workType ? workType : "security"
-        this.#ns.tprintf("Tasking a sleeve to  increase reputation for: %s (%s)", this.constructor.name, actualWorkType)
+
         // we already have a sleeve that is doing the expected work for the faction
         // no need to do anything
         if (claim && (claim.task["factionWorkType"] == actualWorkType)) {
+            this.#ns.tprintf("%s: Found sleeve (%s) already increasing reputation by working in: %s", this.constructor.name, claim.id, actualWorkType)
             return
         }
 
+        this.#ns.tprintf("%s: Tasking a sleeve to increase reputation by working in: %s", this.constructor.name, actualWorkType)
         // we already have a sleeve working for this faction, but it is not doing
         // the right work so we need to release the claim so we can change the task of the
         // sleeve
@@ -146,7 +148,8 @@ export class Faction {
         }
         claim = this.army.setToFactionWork(this.constructor.name, actualWorkType, this.constructor.name)
         if (!claim) {
-            this.#ns.tprintf("No sleeve available")
+            this.#ns.tprintf("%s: No sleeve available")
+            return
         }
         this.#sleeveClaims["FACTION"] = claim
     }
@@ -422,6 +425,9 @@ export class MegaCorporation extends Faction {
     }
 
     sleevesIncreaseReputation(workType) {
+        if (!this.joined()) {
+            return
+        }
         if (this.sleeveClaims["COMPANY"]) {
             this.sleeveClaims["COMPANY"].release()
         }
@@ -614,6 +620,13 @@ export class TheDarkArmy extends CriminalOrganization {
         super(ns, army, money, skills, karma, shouldKill, incompatibleFactions)
     }
 
+    playerIncreaseReputation(workType) {
+        super.playerIncreaseReputation(workType ? workType : "field")
+    }
+
+    sleevesIncreaseReputation(workType) {
+        super.sleevesIncreaseReputation(workType ? workType : "field")
+    }
 }
 export class TheSyndicate extends CriminalOrganization {
     static get name() { return "The Syndicate" }

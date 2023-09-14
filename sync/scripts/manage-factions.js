@@ -18,6 +18,7 @@ export async function main(ns) {
         }
     }
 
+
     // decide which group of citiy factions we want to join
     // based on the augs we already own
     // the default fallback case are the asian cities
@@ -36,7 +37,6 @@ export async function main(ns) {
     }
 
     for (const name of cityFactions) {
-        ns.tprintf("Faction name: %s", name)
         const faction = new factions[name](ns)
         if (faction.canFullfillRequirements()) {
             await faction.fullfillRequirements()
@@ -46,7 +46,7 @@ export async function main(ns) {
             }
             ns.tprintf("Available sleeves: %d", self.sleeveClaims.unclaimed.length)
             if (self.sleeveClaims.unclaimed.length <= 0) {
-                ns.tprintf("All sleeves occupied, not increasing reputation for: %s", faction.name)
+                ns.tprintf("All sleeves occupied, not increasing reputation for: %s", factions[name].name)
                 continue
             }
             if (!faction.haveAllAugs()) {
@@ -68,10 +68,11 @@ export async function main(ns) {
     ]
 
     for (const name of criminalFactions) {
-        if (ns.gang.inGang() && (ns.gang.getGangInformation().faction == name)) {
+        ns.tprintf("##### managing %s #####", name)
+        const faction = new factions[name](ns)
+        if (ns.gang.inGang() && (ns.gang.getGangInformation().faction == factions[name].name)) {
             continue
         }
-        const faction = new factions[name](ns)
         if (faction.canFullfillRequirements()) {
             await faction.fullfillRequirements()
             while (!faction.joined()) {
@@ -80,7 +81,7 @@ export async function main(ns) {
             }
             ns.tprintf("Available sleeves: %d", self.sleeveClaims.unclaimed.length)
             if (self.sleeveClaims.unclaimed.length <= 0) {
-                ns.tprintf("All sleeves occupied, not increasing reputation for: %s", faction.name)
+                ns.tprintf("All sleeves occupied, not increasing reputation for: %s", factions[name].name)
                 continue
             }
             if (!faction.haveAllAugs()) {
@@ -109,10 +110,11 @@ export async function main(ns) {
         faction.join()
         ns.tprintf("Available sleeves: %d", self.sleeveClaims.unclaimed.length)
         if (self.sleeveClaims.unclaimed.length <= 0) {
-            ns.tprintf("All sleeves occupied, not increasing reputation for: %s", faction.name)
-            return
+            ns.tprintf("All sleeves occupied, not increasing reputation for: %s", factions[name].name)
+            continue
         }
         await faction.fullfillRequirements()
+        ns.exit()
         if (!faction.haveAllAugs()) {
             if (!faction.haveMaxAugRep()) {
                 faction.increaseReputation()

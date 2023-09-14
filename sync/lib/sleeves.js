@@ -89,10 +89,24 @@ export class SleeveArmy {
         }
     }
 
-    availableSleeve() {
+    availableSleeve(task) {
         if (this.#claims.unclaimed.length > 0) {
             const unclaimed = this.#claims.unclaimed
-            //this.#ns.tprintf("unclaimed: %s", unclaimed)
+            if (task) {
+                for (const id of unclaimed) {
+                    let equal = true
+                    let sleeveTask = this.api.getTask(id)
+                    for (const key of Object.keys(task)) {
+                        if (sleeveTask[key] != task[key]) {
+                            equal = false
+                            break
+                        }
+                    }
+                    if (equal) {
+                        return id
+                    }
+                }
+            }
             return unclaimed[0]
         }
         return "-1"
@@ -103,7 +117,7 @@ export class SleeveArmy {
             "type": "CRIME",
             "crimeType": crimeType
         }
-        const id = this.availableSleeve()
+        const id = this.availableSleeve(task)
         const claim = this.#claims.claim(id, task, owner)
         if (claim != null) {
             if (!this.api.setToCommitCrime(id, crimeType)) {
@@ -119,10 +133,11 @@ export class SleeveArmy {
             "type": "COMPANY",
             "companyName": companyName
         }
-        const id = this.availableSleeve()
+        const id = this.availableSleeve(task)
         const claim = this.#claims.claim(id, task, owner)
         if (claim != null) {
             if (!this.api.setToCompanyWork(id, companyName)) {
+                this.#ns.tprintf("Failed to set sleeve %s to work for company: %s", id, companyName)
                 this.#claims.release(claim)
                 return null
             }
@@ -136,7 +151,7 @@ export class SleeveArmy {
             "factionWorkType": factionWorkType,
             "factionName": factionName
         }
-        const id = this.availableSleeve()
+        const id = this.availableSleeve(task)
         const claim = this.#claims.claim(id, task, owner)
         if (claim != null) {
             if (!this.api.setToFactionWork(id, factionName, factionWorkType)) {
@@ -153,7 +168,7 @@ export class SleeveArmy {
             "classType": stat,
             "location": gymName
         }
-        const id = this.availableSleeve()
+        const id = this.availableSleeve(task)
         const claim = this.#claims.claim(id, task, owner)
         if (claim != null) {
             if (!this.api.setToGymWorkout(id, gymName, stat)) {
@@ -166,7 +181,7 @@ export class SleeveArmy {
 
     setToIdle(owner) {
         const task = null
-        const id = this.availableSleeve()
+        const id = this.availableSleeve(task)
         const claim = this.#claims.claim(id, task, owner)
         if (claim != null) {
             this.api.setToIdle(id)
@@ -178,7 +193,7 @@ export class SleeveArmy {
         const task = {
             "type": "RECOVERY"
         }
-        const id = this.availableSleeve()
+        const id = this.availableSleeve(task)
         const claim = this.#claims.claim(id, task, owner)
         if (claim != null) {
             if (!this.api.setToShockRecovery(id)) {
@@ -193,7 +208,7 @@ export class SleeveArmy {
         const task = {
             "type": "SYNCHRO"
         }
-        const id = this.availableSleeve()
+        const id = this.availableSleeve(task)
         const claim = this.#claims.claim(id, task, owner)
         if (claim != null) {
             if (!this.api.setToSynchronize(id)) {
@@ -210,7 +225,7 @@ export class SleeveArmy {
             "classType": className,
             "location": university
         }
-        const id = this.availableSleeve()
+        const id = this.availableSleeve(task)
         const claim = this.#claims.claim(id, task, owner)
         if (claim != null) {
             if (!this.api.setToUniversityCourse(id, university, className)) {
@@ -251,8 +266,10 @@ export class SleeveClaim {
 
 export class SleeveClaims {
     #claims
-    constructor() {
+    #ns
+    constructor(ns) {
         this.#claims = {}
+        this.#ns = ns
     }
 
     static get validIDs() { return ["0", "1", "2", "3", "4", "5", "6", "7"] }
@@ -264,6 +281,10 @@ export class SleeveClaims {
             claimed = []
         }
         return SleeveClaims.validIDs.filter((id) => !claimed.includes(id))
+    }
+
+    get claims() {
+        return this.#claims
     }
 
     ownedClaims(owner) {
